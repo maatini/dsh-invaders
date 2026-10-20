@@ -1,0 +1,31 @@
+[tools]
+go = "1.26.2"
+
+[tasks.setup]
+description = "Go-Module und Abhängigkeiten herunterladen"
+run = "go mod download"
+
+[tasks.dev]
+description = "Entwicklungsserver auf http://127.0.0.1:4300 starten"
+run = "go run ./cmd/neon-invaders"
+
+[tasks.build]
+description = "Produktions-Binary nach bin/neon-invaders bauen"
+run = "go build -trimpath -ldflags \"-s -w -X main.version=1.0.0\" -o bin/neon-invaders ./cmd/neon-invaders"
+
+[tasks.start]
+description = "Gebautes Binary starten"
+depends = ["build"]
+run = "./bin/neon-invaders"
+
+[tasks.test]
+description = "Alle Go-Tests ausführen"
+run = "go test ./..."
+
+[tasks.check]
+description = "Formatierung prüfen, vetten und testen"
+run = [
+  "test -z \"$(gofmt -l ./cmd ./internal ./web)\" || (echo \"Bitte gofmt ausführen\" && exit 1)",
+  "go vet ./...",
+  "go test ./...",
+]

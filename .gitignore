@@ -1,0 +1,8 @@
+/data/
+/bin/
+/.cache/
+/tmp/
+*.db
+*.db-shm
+*.db-wal
+.DS_Store

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="de">
+<head>
+{{template "head" .}}
+</head>
+<body class="page-settings">
+{{template "nav" .}}
+<main id="main" class="container narrow">
+  <header class="page-head">
+    <div>
+      <p class="eyebrow"><span class="pulse-dot" aria-hidden="true"></span> Konfiguration // Cockpit</p>
+      <h1 class="page-title">Einstellungen</h1>
+      <p class="lede">Stell den Sound ein und wähle, wie viel Druck die Invader machen dürfen. Die Auswahl gilt sofort für den nächsten Lauf.</p>
+    </div>
+  </header>
+
+  {{template "settings-panel" .}}
+
+  <section class="panel settings-info">
+    <h2 class="panel-title">Gut zu wissen</h2>
+    <ul class="info-list">
+      <li><span aria-hidden="true">◈</span> Einstellungen werden lokal als Cookie gespeichert – kein Konto nötig.</li>
+      <li><span aria-hidden="true">◈</span> Im Spiel kannst du den Sound jederzeit mit <kbd>M</kbd> umschalten.</li>
+      <li><span aria-hidden="true">◈</span> Der Schwierigkeitsgrad beeinflusst Leben, Gegnergeschwindigkeit und Punktefaktor.</li>
+      <li><span aria-hidden="true">◈</span> Highscores werden serverseitig auf Plausibilität geprüft.</li>
+    </ul>
+  </section>
+</main>
+{{template "footer" .}}
+</body>
+</html>

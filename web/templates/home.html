@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="de">
+<head>
+{{template "head" .}}
+</head>
+<body class="page-home">
+{{template "nav" .}}
+<main id="main" class="container home">
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="pulse-dot" aria-hidden="true"></span> Arcade-Protokoll // Sektor 2026</p>
+      <h1 class="display">Neon<br><span class="display-accent">Invaders</span></h1>
+      <p class="lede">Die klassische Invader-Formation, neu verdrahtet: zerstörbare Bunker, drei Power-Ups, Partikelstürme und ein Mystery-Ship, das nie lange bleibt.</p>
+      <div class="actions">
+        <a class="btn btn-primary btn-lg" href="/play">Spiel starten <span aria-hidden="true">▸</span></a>
+        <a class="btn btn-ghost btn-lg" href="/scores">Bestenliste</a>
+      </div>
+      <div class="score-beacon">
+        <span class="beacon-label">Aktueller Highscore</span>
+        {{if .HasBest}}
+        <span class="beacon-score">{{formatNumber .Best.Score}}</span>
+        <span class="beacon-meta">{{.Best.Name}} · Welle {{.Best.Level}} · {{difficulty .Best.Difficulty}}</span>
+        {{else}}
+        <span class="beacon-score">000.000</span>
+        <span class="beacon-meta">Noch kein Eintrag – setze den ersten Rekord.</span>
+        {{end}}
+      </div>
+    </div>
+
+    <div class="hero-visual" aria-hidden="true">
+      <div class="arcade-frame">
+        <div class="arcade-bar">
+          <span>PLAYER 1</span>
+          <span class="blink">INSERT COIN</span>
+          <span>HI {{formatNumber .Highscore}}</span>
+        </div>
+        <div class="arcade-screen">
+          <div class="screen-glow"></div>
+          <div class="formation">
+            <div class="invader-row invader-row--elite">
+              <svg class="invader invader-elite" viewBox="0 0 11 8"><use href="#icon-invader"></use></svg>
+              <svg class="invader invader-elite" viewBox="0 0 11 8"><use href="#icon-invader"></use></svg>
+              <svg class="invader invader-elite" viewBox="0 0 11 8"><use href="#icon-invader"></use></svg>
+              <svg class="invader invader-elite" viewBox="0 0 11 8"><use href="#icon-invader"></use></svg>
+              <svg class="invader invader-elite" viewBox="0 0 11 8"><use href="#icon-invader"></use></svg>
+            </div>
+            <div class="invader-row invader-row--crab">
+              <svg class="invader invader-crab" viewBox="0 0 11 8"><use href="#icon-invader"></use></svg>
+              <svg class="invader invader-crab" viewBox="0 0 11 8"><use href="#icon-invader"></use></svg>
+              <svg class="invader invader-crab" viewBox="0 0 11 8"><use href="#icon-invader"></use></svg>
+              <svg class="invader invader-crab" viewBox="0 0 11 8"><use href="#icon-invader"></use></svg>
+              <svg class="invader invader-crab" viewBox="0 0 11 8"><use href="#icon-invader"></use></svg>
+            </div>
+            <div class="invader-row invader-row--octo">
+              <svg class="invader invader-octo" viewBox="0 0 12 8"><use href="#icon-invader"></use></svg>
+              <svg class="invader invader-octo" viewBox="0 0 12 8"><use href="#icon-invader"></use></svg>
+              <svg class="invader invader-octo" viewBox="0 0 12 8"><use href="#icon-invader"></use></svg>
+              <svg class="invader invader-octo" viewBox="0 0 12 8"><use href="#icon-invader"></use></svg>
+              <svg class="invader invader-octo" viewBox="0 0 12 8"><use href="#icon-invader"></use></svg>
+            </div>
+          </div>
+          <svg class="hero-ufo" viewBox="0 0 16 7"><use href="#icon-ufo"></use></svg>
+          <div class="hero-bullet"></div>
+          <div class="hero-bunker"><span></span><span></span><span></span></div>
+          <div class="hero-player">
+            <svg viewBox="0 0 13 8"><use href="#icon-ship"></use></svg>
+          </div>
+          <div class="screen-floor"></div>
+          <div class="screen-scan"></div>
+        </div>
+        <div class="arcade-bar arcade-bar--bottom">
+          <span>1UP <strong>{{formatNumber .Highscore}}</strong></span>
+          <span>CREDIT 00</span>
+        </div>
+      </div>
+      <p class="hero-caption"><span class="live-dot" aria-hidden="true"></span> Live im Browser · kein Download</p>
+    </div>
+  </section>
+
+  <section class="stats-strip" aria-label="Spielumfang">
+    <div class="stat"><strong>04</strong><span>Gegner-Typen</span></div>
+    <div class="stat"><strong>03</strong><span>Power-Ups</span></div>
+    <div class="stat"><strong>∞</strong><span>Wellen</span></div>
+    <div class="stat"><strong>60</strong><span>FPS Glow</span></div>
+  </section>
+
+  <section class="home-grid">
+    <div class="panel leader-panel">
+      <header class="panel-head">
+        <div>
+          <p class="eyebrow">Hall of Fame</p>
+          <h2 class="panel-title">Top-Piloten</h2>
+        </div>
+        <a class="text-link" href="/scores">Alle 10 ansehen <span aria-hidden="true">→</span></a>
+      </header>
+      {{template "score-table" .}}
+    </div>
+
+    <aside class="panel feature-panel">
+      <p class="eyebrow">Systemfeatures</p>
+      <h2 class="panel-title">Mehr als 1978</h2>
+      <ul class="feature-list">
+        <li>
+          <span class="feature-index">01</span>
+          <div><strong>Destruktive Bunker</strong><span>Jeder Treffer frisst sich durch den Schutzschild.</span></div>
+        </li>
+        <li>
+          <span class="feature-index">02</span>
+          <div><strong>Drei Power-Ups</strong><span>Rapid-Fire, Spread-Shot und ein temporäres Shield.</span></div>
+        </li>
+        <li>
+          <span class="feature-index">03</span>
+          <div><strong>Eskalierende Wellen</strong><span>Mehr Speed, mehr Salven, mehr Punkte.</span></div>
+        </li>
+        <li>
+          <span class="feature-index">04</span>
+          <div><strong>UFO auf Abruf</strong><span>Das Mystery-Ship taucht unangekündigt auf.</span></div>
+        </li>
+      </ul>
+      <a class="btn btn-primary btn-block" href="/play">Jetzt starten</a>
+    </aside>
+  </section>
+
+  <section class="controls-strip" aria-label="Steuerung">
+    <div class="controls-copy">
+      <p class="eyebrow">Steuerung</p>
+      <h2 class="panel-title">Bereit in drei Tasten</h2>
+      <p class="muted">Bewegen, feuern, ausweichen. Pause mit <kbd>P</kbd>, Sound mit <kbd>M</kbd>.</p>
+    </div>
+    <div class="key-row">
+      <span class="key-group"><kbd>←</kbd><kbd>→</kbd><small>oder A / D</small></span>
+      <span class="key-group"><kbd class="key-wide">Leertaste</kbd><small>Feuern</small></span>
+      <span class="key-group"><kbd>P</kbd><small>Pause</small></span>
+    </div>
+    <a class="text-link" href="/settings">Sound &amp; Schwierigkeit <span aria-hidden="true">→</span></a>
+  </section>
+</main>
+{{template "footer" .}}
+</body>
+</html>

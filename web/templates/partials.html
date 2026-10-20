@@ -1,0 +1,190 @@
+{{define "sprite-sheet"}}
+<svg class="sprite-sheet" aria-hidden="true" focusable="false">
+  <symbol id="icon-invader" viewBox="0 0 11 8">
+    <path d="M2 0h1v1h-1zM8 0h1v1h-1zM3 1h1v1h-1zM7 1h1v1h-1zM2 2h7v1h-7zM1 3h2v1h-2zM4 3h3v1h-3zM8 3h2v1h-2zM0 4h11v1h-11zM0 5h1v1h-1zM2 5h7v1h-7zM10 5h1v1h-1zM0 6h1v1h-1zM2 6h1v1h-1zM8 6h1v1h-1zM10 6h1v1h-1zM3 7h2v1h-2zM6 7h2v1h-2z"/>
+  </symbol>
+  <symbol id="icon-ship" viewBox="0 0 13 8">
+    <path d="M6 0h1v1h-1zM5 1h3v1h-3zM5 2h3v1h-3zM2 3h9v1h-9zM1 4h11v1h-11zM0 5h13v1h-13zM0 6h2v1h-2zM3 6h7v1h-7zM11 6h2v1h-2zM0 7h1v1h-1zM4 7h5v1h-5zM12 7h1v1h-1z"/>
+  </symbol>
+  <symbol id="icon-ufo" viewBox="0 0 16 7">
+    <path d="M5 0h6v1h-6zM3 1h10v1h-10zM2 2h12v1h-12zM1 3h2v1h-2zM4 3h2v1h-2zM7 3h2v1h-2zM10 3h2v1h-2zM13 3h2v1h-2zM0 4h16v1h-16zM2 5h3v1h-3zM7 5h2v1h-2zM11 5h3v1h-3zM3 6h2v1h-2zM11 6h2v1h-2z"/>
+  </symbol>
+</svg>
+{{end}}
+
+{{define "head"}}
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05030d">
+<meta name="description" content="Neon Invaders – ein modernes Pixel-Arcade mit Power-Ups, Partikeln und Neon-Glow. Highscores, Wellen und Sound direkt im Browser.">
+<title>{{.Title}} · Neon Invaders</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/css/app.css">
+<script src="/static/js/htmx.min.js" defer></script>
+<script src="/static/js/app.js" defer></script>
+{{end}}
+
+{{define "nav"}}
+{{template "sprite-sheet" .}}
+<a class="skip-link" href="#main">Zum Inhalt springen</a>
+<header class="site-header">
+  <nav class="nav container" aria-label="Hauptnavigation">
+    <a class="brand" href="/" aria-label="Neon Invaders – Startseite">
+      <svg class="brand-icon" viewBox="0 0 11 8" aria-hidden="true"><use href="#icon-invader"></use></svg>
+      <span class="brand-text">Neon<em>Invaders</em></span>
+    </a>
+    <div class="nav-links">
+      <a class="nav-link{{if eq .Nav "home"}} is-active{{end}}" href="/"{{if eq .Nav "home"}} aria-current="page"{{end}}>Start</a>
+      <a class="nav-link{{if eq .Nav "scores"}} is-active{{end}}" href="/scores"{{if eq .Nav "scores"}} aria-current="page"{{end}}>Bestenliste</a>
+      <a class="nav-link{{if eq .Nav "settings"}} is-active{{end}}" href="/settings"{{if eq .Nav "settings"}} aria-current="page"{{end}}>Einstellungen</a>
+      <a class="btn btn-sm btn-primary nav-play" href="/play">Spielen <span aria-hidden="true">▸</span></a>
+    </div>
+  </nav>
+</header>
+{{end}}
+
+{{define "footer"}}
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <p>© {{.Year}} Neon Invaders <span class="footer-dot">·</span> Gebaut mit Go, HTMX &amp; Canvas.</p>
+    <div class="footer-links">
+      <a href="/healthz">Systemstatus</a>
+      <a href="/scores">Bestenliste</a>
+      <a href="/settings">Einstellungen</a>
+    </div>
+  </div>
+</footer>
+{{end}}
+
+{{define "score-table"}}
+{{if .Notice}}<p class="notice" role="status">{{.Notice}}</p>{{end}}
+{{if .Scores}}
+<div class="table-wrap">
+  <table class="score-table">
+    <caption class="sr-only">Highscore-Rangliste von Neon Invaders</caption>
+    <thead>
+      <tr>
+        <th scope="col">#</th>
+        <th scope="col">Pilot</th>
+        <th scope="col" class="align-right">Score</th>
+        <th scope="col" class="hide-sm">Level</th>
+        <th scope="col" class="hide-sm">Modus</th>
+        <th scope="col" class="hide-md">Datum</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $i, $s := .Scores}}
+      <tr{{if eq $i 0}} class="is-top"{{end}}>
+        <td class="rank">{{rank $i}}</td>
+        <td>
+          <span class="avatar" aria-hidden="true">{{initial $s.Name}}</span>
+          <span class="player-name">{{$s.Name}}</span>
+          {{if eq $i 0}}<span class="crown" title="Platz 1" aria-label="Platz 1">★</span>{{end}}
+        </td>
+        <td class="score align-right">{{formatNumber $s.Score}}</td>
+        <td class="hide-sm">{{$s.Level}}</td>
+        <td class="hide-sm"><span class="badge badge-{{$s.Difficulty}}">{{difficulty $s.Difficulty}}</span></td>
+        <td class="hide-md date">{{formatDate $s.CreatedAt}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{else}}
+<div class="empty-state">
+  <svg class="empty-icon" viewBox="0 0 16 7" aria-hidden="true"><use href="#icon-ufo"></use></svg>
+  <p class="empty-title">Noch keine Einträge</p>
+  <p>Die Bestenliste wartet auf den ersten Rekord.</p>
+  <a class="btn btn-primary btn-sm" href="/play">Ersten Score setzen</a>
+</div>
+{{end}}
+{{end}}
+
+{{define "score-form"}}
+<div id="score-form-area">
+  <form class="score-form" hx-post="/api/scores" hx-target="#score-form-area" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']" hx-indicator="#save-indicator">
+    <input type="hidden" name="token" value="{{.Form.Token}}">
+    <input type="hidden" name="score" id="score-input" value="{{.Form.Score}}">
+    <input type="hidden" name="level" id="level-input" value="{{.Form.Level}}">
+    <label class="field" for="player-name">
+      <span class="field-label">Pilot*innenname</span>
+      <input class="input" id="player-name" type="text" name="name" value="{{.Form.Name}}" maxlength="16" minlength="1" autocomplete="nickname" spellcheck="false" required placeholder="z. B. NOVA">
+      <span class="hint">1–16 Zeichen · Buchstaben, Zahlen, Leerzeichen, . _ -</span>
+    </label>
+    {{if .Form.Error}}<p class="form-error" role="alert">{{.Form.Error}}</p>{{end}}
+    <button class="btn btn-primary btn-block" type="submit">Score eintragen <span aria-hidden="true">→</span></button>
+    <p class="hint form-note"><span id="save-indicator" class="htmx-indicator">Speichern …</span><span id="save-error" role="status"></span></p>
+  </form>
+</div>
+{{end}}
+
+{{define "score-saved"}}
+<div id="score-form-area" class="save-success">
+  <p class="eyebrow">Eintrag bestätigt</p>
+  <h3 class="save-title"><span class="accent">{{.Form.Name}}</span>, Platz #{{.Rank}}</h3>
+  <p class="final-meta">{{formatNumber .Form.Score}} Punkte · Welle {{.Form.Level}} · Modus {{difficulty .Form.Difficulty}}</p>
+  <div class="actions actions-center">
+    <button type="button" class="btn btn-primary" data-action="restart">Nochmal spielen</button>
+    <a class="btn btn-ghost" href="/scores">Bestenliste</a>
+  </div>
+</div>
+{{end}}
+
+{{define "settings-panel"}}
+<section id="settings-panel" class="panel settings-panel" aria-labelledby="settings-title">
+  <form hx-post="/settings" hx-target="#settings-panel" hx-swap="outerHTML" hx-indicator="#settings-indicator">
+    <h2 id="settings-title" class="panel-title">Spielkonfiguration</h2>
+    {{if .Saved}}<p class="notice notice-success" role="status">Einstellungen gespeichert.</p>{{end}}
+
+    <fieldset class="settings-group">
+      <legend>Sound</legend>
+      <label class="switch-row" for="sound-toggle">
+        <span class="switch-copy">
+          <strong>Soundeffekte</strong>
+          <small>Schüsse, Explosionen, UFO-Warble und die Invader-Marschlinie.</small>
+        </span>
+        <span class="switch-control">
+          <input class="switch-input" id="sound-toggle" type="checkbox" name="sound" value="on"{{if .Settings.Sound}} checked{{end}}>
+          <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+        </span>
+      </label>
+    </fieldset>
+
+    <fieldset class="settings-group">
+      <legend>Schwierigkeitsgrad</legend>
+      <div class="difficulty-grid">
+        <label class="difficulty-option">
+          <input type="radio" name="difficulty" value="easy"{{if eq .Settings.Difficulty "easy"}} checked{{end}}>
+          <span class="difficulty-card">
+            <span class="difficulty-name">Leicht</span>
+            <span class="difficulty-desc">5 Leben, ruhigere Salven. Zum Ankommen.</span>
+            <span class="difficulty-meta">Score ×1,0</span>
+          </span>
+        </label>
+        <label class="difficulty-option">
+          <input type="radio" name="difficulty" value="normal"{{if eq .Settings.Difficulty "normal"}} checked{{end}}>
+          <span class="difficulty-card">
+            <span class="difficulty-name">Normal</span>
+            <span class="difficulty-desc">3 Leben, ausbalancierte Wellen. Der Klassiker.</span>
+            <span class="difficulty-meta">Score ×1,0</span>
+          </span>
+        </label>
+        <label class="difficulty-option">
+          <input type="radio" name="difficulty" value="hard"{{if eq .Settings.Difficulty "hard"}} checked{{end}}>
+          <span class="difficulty-card">
+            <span class="difficulty-name">Schwer</span>
+            <span class="difficulty-desc">2 Leben, schnellere Invasoren. Kein Netz.</span>
+            <span class="difficulty-meta">Score ×1,25</span>
+          </span>
+        </label>
+      </div>
+    </fieldset>
+
+    <div class="settings-actions">
+      <button class="btn btn-primary" type="submit">Speichern</button>
+      <span id="settings-indicator" class="hint htmx-indicator">Speichern …</span>
+    </div>
+    <p class="hint">Die Auswahl wird als Cookie gespeichert. Kein Konto, kein Tracking.</p>
+  </form>
+</section>
+{{end}}

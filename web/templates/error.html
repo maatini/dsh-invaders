@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="de">
+<head>
+{{template "head" .}}
+</head>
+<body class="page-error">
+{{template "nav" .}}
+<main id="main" class="container narrow">
+  <section class="panel error-panel">
+    <p class="eyebrow">Störung im Signal</p>
+    <p class="error-code">{{.Status}}</p>
+    <h1 class="page-title">{{.StatusText}}</h1>
+    <p class="lede">{{.Error}}</p>
+    <div class="actions">
+      <a class="btn btn-primary" href="/">Zum Start</a>
+      <a class="btn btn-ghost" href="/play">Spiel starten</a>
+    </div>
+  </section>
+</main>
+{{template "footer" .}}
+</body>
+</html>

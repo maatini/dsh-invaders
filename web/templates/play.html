@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="de">
+<head>
+{{template "head" .}}
+</head>
+<body class="page-play">
+{{template "nav" .}}
+<main id="main" class="container game-page">
+  <div id="game-root" class="game-shell"
+       data-token="{{.Token}}"
+       data-highscore="{{.Highscore}}"
+       data-difficulty="{{.Settings.Difficulty}}"
+       data-difficulty-label="{{difficulty .Settings.Difficulty}}"
+       data-sound="{{if .Settings.Sound}}on{{else}}off{{end}}">
+  <div class="game-hud" aria-label="Spielstatus">
+    <div class="hud-cell">
+      <span class="hud-label">Score</span>
+      <strong class="hud-value" id="hud-score">0</strong>
+    </div>
+    <div class="hud-cell">
+      <span class="hud-label">Highscore</span>
+      <strong class="hud-value hud-best" id="hud-best">{{formatNumber .Highscore}}</strong>
+    </div>
+    <div class="hud-cell">
+      <span class="hud-label">Welle</span>
+      <strong class="hud-value" id="hud-level">1</strong>
+    </div>
+    <div class="hud-cell hud-lives">
+      <span class="hud-label">Leben</span>
+      <span class="lives" id="hud-lives" aria-label="3 Leben"></span>
+    </div>
+    <div class="hud-cell hud-power">
+      <span class="hud-label">Power-Ups</span>
+      <div class="powerup-chips" id="hud-powerups"><span class="powerup-empty">–</span></div>
+    </div>
+  </div>
+
+  <div class="game-layout">
+    <div class="stage-column">
+      <div class="stage-shell" id="stage-shell">
+        <canvas id="game-canvas" width="480" height="720" role="img" aria-label="Neon Invaders Spielfeld: Spieler unten, Invader-Formation oben, Bunker in der Mitte"></canvas>
+
+        <div class="stage-overlay" id="start-overlay">
+          <p class="eyebrow"><span class="pulse-dot" aria-hidden="true"></span> System bereit</p>
+          <h1 class="overlay-title">Neon<br><span class="display-accent">Invaders</span></h1>
+          <p class="overlay-copy">Die Formation rückt näher. Halte die Linie, zerlege die Formation und sammle Power-Ups.</p>
+          <button class="btn btn-primary btn-lg" type="button" id="start-button" data-action="start">Spiel starten <span aria-hidden="true">▸</span></button>
+          <p class="overlay-hint"><kbd>←</kbd><kbd>→</kbd> bewegen · <kbd>Leertaste</kbd> feuern · <kbd>P</kbd> Pause</p>
+          {{if .HasBest}}<p class="overlay-record">Highscore: <strong>{{formatNumber .Best.Score}}</strong> von {{.Best.Name}}</p>{{else}}<p class="overlay-record">Noch kein Highscore – dieser Lauf kann Geschichte schreiben.</p>{{end}}
+        </div>
+
+        <div class="stage-overlay" id="pause-overlay" hidden>
+          <p class="eyebrow">Signal angehalten</p>
+          <h2 class="overlay-title">Pause</h2>
+          <p class="overlay-copy">Das Universum wartet. Meistens.</p>
+          <div class="actions actions-center">
+            <button class="btn btn-primary" type="button" data-action="resume">Weiter <span aria-hidden="true">▸</span></button>
+            <button class="btn btn-ghost" type="button" data-action="restart">Neustart</button>
+          </div>
+          <p class="overlay-hint"><kbd>P</kbd> oder <kbd>Esc</kbd> zum Fortsetzen</p>
+        </div>
+
+        <div class="stage-overlay stage-overlay--gameover" id="gameover-overlay" hidden>
+          <p class="eyebrow"><span class="pulse-dot pulse-dot--danger" aria-hidden="true"></span> Signal verloren</p>
+          <h2 class="overlay-title">Game<br><span class="display-accent">Over</span></h2>
+          <p class="final-score"><strong id="final-score">0</strong><span>Punkte</span></p>
+          <p class="final-meta">Welle <span id="final-level">1</span> · Modus <span id="final-difficulty">{{difficulty .Settings.Difficulty}}</span></p>
+          {{template "score-form" .}}
+        </div>
+      </div>
+
+      <div class="touch-controls" aria-label="Touch-Steuerung">
+        <button class="touch-btn" type="button" id="touch-left" aria-label="Nach links bewegen">◀</button>
+        <button class="touch-btn touch-fire" type="button" id="touch-fire" aria-label="Feuern">Feuer</button>
+        <button class="touch-btn" type="button" id="touch-right" aria-label="Nach rechts bewegen">▶</button>
+      </div>
+    </div>
+
+    <aside class="game-aside">
+      <section class="panel aside-panel">
+        <p class="eyebrow">Ziel</p>
+        <h2 class="panel-title">Rekord jagen</h2>
+        <div class="aside-record">
+          <span>Highscore</span>
+          <strong id="aside-highscore">{{formatNumber .Highscore}}</strong>
+        </div>
+        <p class="muted small">{{if .HasBest}}Aufgestellt von {{.Best.Name}} in Welle {{.Best.Level}}.{{else}}Noch kein Eintrag. Der erste gehört dir.{{end}}</p>
+      </section>
+
+      <section class="panel aside-panel">
+        <h2 class="panel-title">Steuerung</h2>
+        <ul class="control-list">
+          <li><span class="control-keys"><kbd>←</kbd><kbd>→</kbd></span><span>Bewegen <small>A / D</small></span></li>
+          <li><span class="control-keys"><kbd class="key-wide">Space</kbd></span><span>Feuern</span></li>
+          <li><span class="control-keys"><kbd>P</kbd></span><span>Pause <small>Esc</small></span></li>
+          <li><span class="control-keys"><kbd>M</kbd></span><span>Sound</span></li>
+        </ul>
+      </section>
+
+      <section class="panel aside-panel">
+        <h2 class="panel-title">Power-Ups</h2>
+        <ul class="powerup-legend">
+          <li><span class="powerup-icon powerup-rapid">R</span><span><strong>Rapid-Fire</strong><small>Dauerfeuer, doppelte Kadenz.</small></span></li>
+          <li><span class="powerup-icon powerup-spread">W</span><span><strong>Spread-Shot</strong><small>Drei Schüsse pro Salve.</small></span></li>
+          <li><span class="powerup-icon powerup-shield">S</span><span><strong>Shield</strong><small>Schluckt Treffer für 9 Sekunden.</small></span></li>
+        </ul>
+      </section>
+
+      <div class="game-buttons">
+        <button class="btn btn-ghost btn-sm" type="button" id="sound-toggle-button" aria-pressed="{{if .Settings.Sound}}true{{else}}false{{end}}"><span class="sound-icon" aria-hidden="true">♪</span> <span id="sound-toggle-label">Sound: {{if .Settings.Sound}}an{{else}}aus{{end}}</span></button>
+        <button class="btn btn-ghost btn-sm" type="button" id="pause-button" data-action="pause">Pause</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-action="restart">Neustart</button>
+      </div>
+    </aside>
+  </div>
+
+  <p class="sr-only" id="game-status" aria-live="polite">Bereit. Starte das Spiel mit dem Start-Button.</p>
+  </div>
+</main>
+{{template "footer" .}}
+<script src="/static/js/game.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+<head>
+{{template "head" .}}
+</head>
+<body class="page-scores">
+{{template "nav" .}}
+<main id="main" class="container">
+  <header class="page-head">
+    <div>
+      <p class="eyebrow"><span class="pulse-dot" aria-hidden="true"></span> Übertragung // Rangliste</p>
+      <h1 class="page-title">Bestenliste</h1>
+      <p class="lede">Die zehn höchsten Scores. Jeder Lauf wird zeitlich geprüft, bevor er im Neon-Archiv landet.</p>
+    </div>
+    <a class="btn btn-primary" href="/play">Neuen Lauf starten <span aria-hidden="true">▸</span></a>
+  </header>
+
+  <section class="stat-row" aria-label="Statistik">
+    <div class="stat-card panel">
+      <span class="stat-label">Highscore</span>
+      <strong class="stat-value">{{if .HasBest}}{{formatNumber .Stats.Best}}{{else}}–{{end}}</strong>
+      <span class="stat-sub">{{if .HasBest}}{{.Best.Name}}{{else}}Noch leer{{end}}</span>
+    </div>
+    <div class="stat-card panel">
+      <span class="stat-label">Geflogene Runs</span>
+      <strong class="stat-value">{{formatNumber .Stats.Runs}}</strong>
+      <span class="stat-sub">seit Serverstart</span>
+    </div>
+    <div class="stat-card panel">
+      <span class="stat-label">Punkte gesamt</span>
+      <strong class="stat-value">{{formatNumber .Stats.Total}}</strong>
+      <span class="stat-sub">über alle Pilot*innen</span>
+    </div>
+  </section>
+
+  <section class="panel leaderboard-panel" aria-labelledby="leaderboard-title">
+    <header class="panel-head">
+      <div>
+        <p class="eyebrow">Top 10</p>
+        <h2 id="leaderboard-title" class="panel-title">Neon-Archiv</h2>
+      </div>
+      <span class="archive-status"><span class="live-dot" aria-hidden="true"></span> synchronisiert</span>
+    </header>
+    {{template "score-table" .}}
+  </section>
+
+  <section class="cta-panel panel">
+    <div>
+      <p class="eyebrow">Dein Name fehlt?</p>
+      <h2 class="panel-title">Der nächste Rekord wartet.</h2>
+      <p class="muted">Starte eine neue Welle und kämpfe dich in die Top 10.</p>
+    </div>
+    <a class="btn btn-primary btn-lg" href="/play">Spiel starten <span aria-hidden="true">▸</span></a>
+  </section>
+</main>
+{{template "footer" .}}
+</body>
+</html>
