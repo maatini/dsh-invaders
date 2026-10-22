@@ -769,7 +769,10 @@
       handled = false;
     }
 
-    if (handled && (code === "ArrowLeft" || code === "ArrowRight" || code === "Space")) {
+    if (
+      handled &&
+      (code === "ArrowLeft" || code === "ArrowRight" || code === "ArrowUp" || code === "Space")
+    ) {
       event.preventDefault();
     }
   };
@@ -840,6 +843,7 @@
     this.setOverlay(this.startOverlay, false);
     this.setOverlay(this.pauseOverlay, false);
     this.setOverlay(this.gameOverOverlay, false);
+    this.focusCanvas();
     this.restoreScoreForm();
     this.updateTokenField();
     this.refreshRunToken();
@@ -944,6 +948,9 @@
     this.state = "paused";
     this.keys.left = this.keys.right = this.keys.fire = false;
     this.setOverlay(this.pauseOverlay, true);
+    this.focusElement(
+      this.pauseOverlay && this.pauseOverlay.querySelector('[data-action="resume"]')
+    );
     if (this.pauseButton) this.pauseButton.textContent = "Weiter";
     this.status("Spiel pausiert. P oder Escape zum Fortsetzen.");
   };
@@ -953,6 +960,7 @@
     this.sound.unlock();
     this.state = "playing";
     this.setOverlay(this.pauseOverlay, false);
+    this.focusCanvas();
     if (this.pauseButton) this.pauseButton.textContent = "Pause";
     this.status("Weiter geht's. Welle " + this.level + ".");
   };
@@ -970,6 +978,19 @@
     overlay.hidden = !visible;
   };
 
+  Game.prototype.focusElement = function (element) {
+    if (!element) return;
+    try {
+      element.focus({ preventScroll: true });
+    } catch (err) {
+      element.focus();
+    }
+  };
+
+  Game.prototype.focusCanvas = function () {
+    this.focusElement(this.canvas);
+  };
+
   Game.prototype.clearLevel = function () {
     if (this.state !== "playing") return;
     this.state = "levelclear";
@@ -982,7 +1003,7 @@
       t: 2.7,
       max: 2.7
     };
-    this.shake(4, 0.25);
+    this.shake(4);
     this.sound.levelUp();
     for (var i = 0; i < 5; i++) {
       this.burst(rand(VW * 0.15, VW * 0.85), rand(160, 360), pick([COLORS.cyan, COLORS.pink, COLORS.green, COLORS.amber]), 18, 230, 3);
@@ -1263,7 +1284,7 @@
     this.grantScore(points, pos.x, pos.y - 12, type.color);
     this.burst(pos.x, pos.y, type.color, 18, 190, 2.6);
     this.burst(pos.x, pos.y, COLORS.white, 6, 120, 1.6);
-    this.shake(2.4, 0.12);
+    this.shake(2.4);
     this.sound.hit();
     this.maybeDropPowerup(pos.x, pos.y, 0.095);
     if (this.aliveInvaders().length === 0) {
@@ -1478,7 +1499,7 @@
     this.grantScore(points, x, y - 16, COLORS.amber);
     this.burst(x, y, COLORS.amber, 34, 280, 3.2);
     this.burst(x, y, COLORS.pink, 16, 180, 2.4);
-    this.shake(6, 0.3);
+    this.shake(6);
     this.sound.explode();
     this.maybeDropPowerup(x, y, 0.62);
     this.ufo = null;
@@ -1567,8 +1588,7 @@
       this.power.shield = Math.max(0, this.power.shield - 3);
       this.burst(sourceX, sourceY, COLORS.green, 16, 190, 2.4);
       this.sound.shieldBreak();
-      this.shake(3, 0.2);
-      if (this.power.shield === 0) this.sound.shieldBreak();
+      this.shake(3);
       this.updateHud(true);
       return true;
     }
@@ -1577,7 +1597,7 @@
     this.player.invulnerable = 2.5;
     this.burst(this.player.x, this.player.y, COLORS.cyan, 34, 260, 3);
     this.burst(this.player.x, this.player.y, COLORS.pink, 20, 180, 2.4);
-    this.shake(10, 0.4);
+    this.shake(10);
     this.flash(0.28);
     this.updateHud(true);
 
@@ -1587,7 +1607,7 @@
     }
 
     this.sound.playerHit();
-    this.status("Treffer! Noch " + this.lives + (this.lives === 1 ? " Leben." : " Leben."));
+    this.status("Treffer! Noch " + this.lives + " Leben.");
     return true;
   };
 
@@ -1602,7 +1622,7 @@
     this.burst(this.player.x, this.player.y, COLORS.cyan, 60, 330, 3.4);
     this.burst(this.player.x, this.player.y, COLORS.pink, 36, 240, 2.8);
     this.burst(this.player.x, this.player.y, COLORS.white, 18, 160, 2);
-    this.shake(16, 0.7);
+    this.shake(16);
     this.flash(0.5);
     this.sound.playerHit();
     this.sound.gameOver();
@@ -1808,10 +1828,9 @@
     }
   };
 
-  Game.prototype.shake = function (amount, duration) {
+  Game.prototype.shake = function (amount) {
     if (this.reduceMotion) return;
     this.shakeAmount = Math.max(this.shakeAmount, amount);
-    this.shakeDuration = Math.max(this.shakeDuration || 0, duration || 0.2);
   };
 
   Game.prototype.flash = function (amount) {
@@ -1919,7 +1938,7 @@
         this.livesEl.innerHTML = livesHTML;
         this.livesEl.setAttribute(
           "aria-label",
-          this.lives + (this.lives === 1 ? " Leben" : " Leben")
+          this.lives + " Leben"
         );
       }
       cache.lives = livesHTML;

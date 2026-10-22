@@ -1,6 +1,7 @@
 package server
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"io"
@@ -13,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"neoninvaders/internal/store"
+	"github.com/maatini/dsh-invaders/internal/store"
 )
 
 type testEnv struct {
@@ -320,7 +321,148 @@ func TestPlausibilityBounds(t *testing.T) {
 	if got := plausibleMaxLevel(0); got != 1 {
 		t.Errorf("zero elapsed max level = %d, want 1", got)
 	}
-	if got := plausibleMaxLevel(5 * time.Minute); got != 26 {
-		t.Errorf("5min max level = %d, want 26", got)
+	if got := plausibleMaxLevel(5 * time.Minute); got != 38 {
+		t.Errorf("5min max level = %d, want 38", got)
+	}
+	if got := plausibleMaxLevel(48 * time.Hour); got != 999 {
+		t.Errorf("huge elapsed max level = %d, want 999", got)
+	}
+}
+
+func TestSubmitScoreIsSingleUse(t *testing.T) {
+	env := newTestEnv(t)
+	token, err := issueRunToken(env.secret, env.now.Add(-30*time.Second), "normal")
+	if err != nil {
+		t.Fatalf("issueRunToken: %v", err)
+	}
+	form := url.Values{
+		"token": {token},
+		"name":  {"Nova"},
+		"score": {"900"},
+		"level": {"1"},
+	}
+	if rec := env.do(t, http.MethodPost, "/api/scores", form, map[string]string{"HX-Request": "true"}); rec.Code != http.StatusCreated {
+		t.Fatalf("first submit = %d, want 201; body: %s", rec.Code, rec.Body.String())
+	}
+	if rec := env.do(t, http.MethodPost, "/api/scores", form, map[string]string{"HX-Request": "true"}); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("replay = %d, want 422; body: %s", rec.Code, rec.Body.String())
+	}
+	top, err := env.store.Top(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("Top: %v", err)
+	}
+	if len(top) != 1 {
+		t.Fatalf("stored %d scores, want 1", len(top))
+	}
+}
+
+func TestInvalidNameDoesNotConsumeToken(t *testing.T) {
+	env := newTestEnv(t)
+	token, err := issueRunToken(env.secret, env.now.Add(-30*time.Second), "normal")
+	if err != nil {
+		t.Fatalf("issueRunToken: %v", err)
+	}
+	invalid := url.Values{
+		"token": {token},
+		"name":  {"Nova<script>"},
+		"score": {"900"},
+		"level": {"1"},
+	}
+	if rec := env.do(t, http.MethodPost, "/api/scores", invalid, map[string]string{"HX-Request": "true"}); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("invalid name = %d, want 422", rec.Code)
+	}
+	valid := url.Values{
+		"token": {token},
+		"name":  {"Nova"},
+		"score": {"900"},
+		"level": {"1"},
+	}
+	if rec := env.do(t, http.MethodPost, "/api/scores", valid, map[string]string{"HX-Request": "true"}); rec.Code != http.StatusCreated {
+		t.Fatalf("retry = %d, want 201; body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGzipAndStaticDirectories(t *testing.T) {
+	env := newTestEnv(t)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rec := httptest.NewRecorder()
+	env.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if enc := rec.Header().Get("Content-Encoding"); enc != "gzip" {
+		t.Fatalf("content encoding = %q, want gzip", enc)
+	}
+	zr, err := gzip.NewReader(rec.Body)
+	if err != nil {
+		t.Fatalf("gzip reader: %v", err)
+	}
+	body, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatalf("read gzip body: %v", err)
+	}
+	if !strings.Contains(string(body), "Neon") {
+		t.Error("decompressed body does not contain Neon")
+	}
+
+	rec = env.do(t, http.MethodGet, "/static/", nil, nil)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("static directory = %d, want 404", rec.Code)
+	}
+	rec = env.do(t, http.MethodGet, "/static/js/game.js", nil, nil)
+	if rec.Code != http.StatusOK {
+		t.Errorf("static file = %d, want 200", rec.Code)
+	}
+}
+
+func TestCrossOriginPostBlocked(t *testing.T) {
+	env := newTestEnv(t)
+	rec := env.do(t, http.MethodPost, "/settings", url.Values{"sound": {"on"}}, map[string]string{"Origin": "http://evil.example"})
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", rec.Code)
+	}
+}
+
+func TestOversizedScoreForm(t *testing.T) {
+	env := newTestEnv(t)
+	body := "token=" + strings.Repeat("a", 40*1024)
+	req := httptest.NewRequest(http.MethodPost, "/api/scores", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+	env.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want 413; body: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "zu groß") {
+		t.Error("oversized response does not explain the error")
+	}
+}
+
+func TestSettingsRedirectAndHTTPSHeaders(t *testing.T) {
+	env := newTestEnv(t)
+	rec := env.do(t, http.MethodPost, "/settings", url.Values{"sound": {"on"}, "difficulty": {"easy"}}, nil)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want 303", rec.Code)
+	}
+	if loc := rec.Header().Get("Location"); loc != "/settings?saved=1" {
+		t.Errorf("location = %q", loc)
+	}
+
+	rec = env.do(t, http.MethodGet, "/settings", nil, map[string]string{"X-Forwarded-Proto": "https"})
+	if hsts := rec.Header().Get("Strict-Transport-Security"); hsts == "" {
+		t.Error("missing HSTS behind TLS proxy")
+	}
+
+	rec = env.do(t, http.MethodPost, "/settings", url.Values{"sound": {"on"}, "difficulty": {"easy"}}, map[string]string{"X-Forwarded-Proto": "https"})
+	cookies := rec.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("settings POST did not set cookies")
+	}
+	for _, cookie := range cookies {
+		if !cookie.Secure {
+			t.Errorf("cookie %q is not Secure behind TLS proxy", cookie.Name)
+		}
 	}
 }

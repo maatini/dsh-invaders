@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"neoninvaders/internal/store"
+	"github.com/maatini/dsh-invaders/internal/store"
 )
 
 const (
@@ -48,7 +48,7 @@ func writeSettings(w http.ResponseWriter, r *http.Request, s Settings) {
 	if !s.Sound {
 		sound = "off"
 	}
-	secure := r.TLS != nil
+	secure := requestIsHTTPS(r)
 	http.SetCookie(w, &http.Cookie{
 		Name:     soundCookie,
 		Value:    sound,

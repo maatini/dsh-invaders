@@ -6,11 +6,12 @@
 <body class="page-play">
 {{template "nav" .}}
 <main id="main" class="container game-page">
+  <h1 class="sr-only">Neon Invaders – Spiel</h1>
+  <noscript><p class="notice">Dieses Spiel benötigt JavaScript. Bitte aktiviere es für deinen Browser.</p></noscript>
   <div id="game-root" class="game-shell"
        data-token="{{.Token}}"
        data-highscore="{{.Highscore}}"
        data-difficulty="{{.Settings.Difficulty}}"
-       data-difficulty-label="{{difficulty .Settings.Difficulty}}"
        data-sound="{{if .Settings.Sound}}on{{else}}off{{end}}">
   <div class="game-hud" aria-label="Spielstatus">
     <div class="hud-cell">
@@ -27,7 +28,7 @@
     </div>
     <div class="hud-cell hud-lives">
       <span class="hud-label">Leben</span>
-      <span class="lives" id="hud-lives" aria-label="3 Leben"></span>
+      <span class="lives" id="hud-lives" role="img" aria-label="3 Leben"></span>
     </div>
     <div class="hud-cell hud-power">
       <span class="hud-label">Power-Ups</span>
@@ -38,20 +39,20 @@
   <div class="game-layout">
     <div class="stage-column">
       <div class="stage-shell" id="stage-shell">
-        <canvas id="game-canvas" width="480" height="720" role="img" aria-label="Neon Invaders Spielfeld: Spieler unten, Invader-Formation oben, Bunker in der Mitte"></canvas>
+        <canvas id="game-canvas" width="480" height="720" tabindex="-1" role="img" aria-label="Neon Invaders Spielfeld: Spieler unten, Invader-Formation oben, Bunker in der Mitte"></canvas>
 
-        <div class="stage-overlay" id="start-overlay">
+        <div class="stage-overlay" id="start-overlay" role="dialog" aria-labelledby="start-title">
           <p class="eyebrow"><span class="pulse-dot" aria-hidden="true"></span> System bereit</p>
-          <h1 class="overlay-title">Neon<br><span class="display-accent">Invaders</span></h1>
+          <h2 class="overlay-title" id="start-title">Neon<br><span class="display-accent">Invaders</span></h2>
           <p class="overlay-copy">Die Formation rückt näher. Halte die Linie, zerlege die Formation und sammle Power-Ups.</p>
           <button class="btn btn-primary btn-lg" type="button" id="start-button" data-action="start">Spiel starten <span aria-hidden="true">▸</span></button>
           <p class="overlay-hint"><kbd>←</kbd><kbd>→</kbd> bewegen · <kbd>Leertaste</kbd> feuern · <kbd>P</kbd> Pause</p>
           {{if .HasBest}}<p class="overlay-record">Highscore: <strong>{{formatNumber .Best.Score}}</strong> von {{.Best.Name}}</p>{{else}}<p class="overlay-record">Noch kein Highscore – dieser Lauf kann Geschichte schreiben.</p>{{end}}
         </div>
 
-        <div class="stage-overlay" id="pause-overlay" hidden>
+        <div class="stage-overlay" id="pause-overlay" role="dialog" aria-labelledby="pause-title" hidden>
           <p class="eyebrow">Signal angehalten</p>
-          <h2 class="overlay-title">Pause</h2>
+          <h2 class="overlay-title" id="pause-title">Pause</h2>
           <p class="overlay-copy">Das Universum wartet. Meistens.</p>
           <div class="actions actions-center">
             <button class="btn btn-primary" type="button" data-action="resume">Weiter <span aria-hidden="true">▸</span></button>
@@ -60,9 +61,9 @@
           <p class="overlay-hint"><kbd>P</kbd> oder <kbd>Esc</kbd> zum Fortsetzen</p>
         </div>
 
-        <div class="stage-overlay stage-overlay--gameover" id="gameover-overlay" hidden>
+        <div class="stage-overlay stage-overlay--gameover" id="gameover-overlay" role="dialog" aria-labelledby="gameover-title" hidden>
           <p class="eyebrow"><span class="pulse-dot pulse-dot--danger" aria-hidden="true"></span> Signal verloren</p>
-          <h2 class="overlay-title">Game<br><span class="display-accent">Over</span></h2>
+          <h2 class="overlay-title" id="gameover-title">Game<br><span class="display-accent">Over</span></h2>
           <p class="final-score"><strong id="final-score">0</strong><span>Punkte</span></p>
           <p class="final-meta">Welle <span id="final-level">1</span> · Modus <span id="final-difficulty">{{difficulty .Settings.Difficulty}}</span></p>
           {{template "score-form" .}}

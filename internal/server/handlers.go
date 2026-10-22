@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"neoninvaders/internal/store"
+	"github.com/maatini/dsh-invaders/internal/store"
 )
 
 const maxFormBytes = 32 << 10
@@ -86,7 +86,14 @@ func (s *Server) handlePlay(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSubmitScore(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
 	if err := r.ParseForm(); err != nil {
-		s.renderError(w, r, http.StatusBadRequest, "Die Anfrage konnte nicht gelesen werden.")
+		status := http.StatusBadRequest
+		message := "Die Anfrage konnte nicht gelesen werden."
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			status = http.StatusRequestEntityTooLarge
+			message = "Die Anfrage ist zu groß."
+		}
+		s.renderScoreError(w, r, status, scoreFormData{}, message)
 		return
 	}
 
@@ -142,8 +149,14 @@ func (s *Server) handleSubmitScore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !s.runs.claim(info.ID, s.now()) {
+		fail(http.StatusUnprocessableEntity, "Dieser Lauf wurde bereits eingetragen. Bitte starte ein neues Spiel.")
+		return
+	}
+
 	rank, err := s.store.Rank(r.Context(), form.Score)
 	if err != nil {
+		s.runs.release(info.ID)
 		s.log.Error("compute rank", "err", err)
 		fail(http.StatusInternalServerError, "Der Score konnte nicht gespeichert werden. Bitte versuche es erneut.")
 		return
@@ -156,6 +169,7 @@ func (s *Server) handleSubmitScore(w http.ResponseWriter, r *http.Request) {
 		Difficulty: info.Difficulty,
 	})
 	if err != nil {
+		s.runs.release(info.ID)
 		s.log.Error("save score", "err", err)
 		fail(http.StatusInternalServerError, "Der Score konnte nicht gespeichert werden. Bitte versuche es erneut.")
 		return
@@ -267,11 +281,34 @@ func (s *Server) handleNotFound(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) renderError(w http.ResponseWriter, r *http.Request, status int, message string) {
-	data := s.page(r, http.StatusText(status), "")
+	data := s.page(r, "Fehler", "")
 	data.Status = status
-	data.StatusText = http.StatusText(status)
+	data.StatusText = germanStatusText(status)
 	data.Error = message
 	s.render(w, r, status, "error.html", data)
+}
+
+func germanStatusText(status int) string {
+	switch status {
+	case http.StatusBadRequest:
+		return "Ungültige Anfrage"
+	case http.StatusForbidden:
+		return "Zugriff verweigert"
+	case http.StatusNotFound:
+		return "Nicht gefunden"
+	case http.StatusMethodNotAllowed:
+		return "Methode nicht erlaubt"
+	case http.StatusRequestEntityTooLarge:
+		return "Anfrage zu groß"
+	case http.StatusUnprocessableEntity:
+		return "Ungültige Eingabe"
+	case http.StatusInternalServerError:
+		return "Interner Serverfehler"
+	case http.StatusServiceUnavailable:
+		return "Dienst nicht verfügbar"
+	default:
+		return "Fehler"
+	}
 }
 
 func (s *Server) writeJSON(w http.ResponseWriter, status int, v any) {

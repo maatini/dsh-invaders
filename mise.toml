@@ -1,5 +1,5 @@
 [tools]
-go = "1.26.2"
+go = "1.26.10"
 
 [tasks.setup]
 description = "Go-Module und Abhängigkeiten herunterladen"
@@ -21,6 +21,10 @@ run = "./bin/neon-invaders"
 [tasks.test]
 description = "Alle Go-Tests ausführen"
 run = "go test ./..."
+
+[tasks.vuln]
+description = "Go-Standardbibliothek und Module auf bekannte Schwachstellen prüfen"
+run = "go run golang.org/x/vuln/cmd/govulncheck@latest ./..."
 
 [tasks.check]
 description = "Formatierung prüfen, vetten und testen"

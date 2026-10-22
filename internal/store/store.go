@@ -79,7 +79,16 @@ func Open(path string) (*Store, error) {
 		}
 	}
 
-	dsn := path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
+	var dsn string
+	if path == ":memory:" {
+		// A shared-cache in-memory database survives multiple pooled connections.
+		dsn = "file::memory:?cache=shared&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
+	} else {
+		if strings.ContainsAny(path, "?#") {
+			return nil, errors.New("store: database path must not contain '?' or '#'")
+		}
+		dsn = path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
+	}
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("store: open database: %w", err)
@@ -158,8 +167,11 @@ func (s *Store) Add(ctx context.Context, in NewScore) (Score, error) {
 // Top returns the best entries, ordered by score (descending) and age
 // (oldest first, so earlier runs keep the higher rank on ties).
 func (s *Store) Top(ctx context.Context, limit int) ([]Score, error) {
-	if limit <= 0 || limit > 100 {
+	if limit <= 0 {
 		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
 	}
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, name, score, level, difficulty, created_at

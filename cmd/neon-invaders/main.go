@@ -14,8 +14,8 @@ import (
 	"syscall"
 	"time"
 
-	"neoninvaders/internal/server"
-	"neoninvaders/internal/store"
+	"github.com/maatini/dsh-invaders/internal/server"
+	"github.com/maatini/dsh-invaders/internal/store"
 )
 
 // version is overridden at build time with -ldflags "-X main.version=...".
@@ -31,7 +31,7 @@ func main() {
 func run(args []string) error {
 	fs := flag.NewFlagSet("neon-invaders", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	addr := fs.String("addr", envOr("ADDR", ":4300"), "HTTP listen address")
+	addr := fs.String("addr", envOr("ADDR", "127.0.0.1:4300"), "HTTP listen address")
 	dbPath := fs.String("db", envOr("DB_PATH", "data/neon-invaders.db"), "path to the SQLite database")
 	logLevel := fs.String("log-level", envOr("LOG_LEVEL", "info"), "log level: debug, info, warn, error")
 	showVersion := fs.Bool("version", false, "print version and exit")

@@ -507,6 +507,7 @@ kbd {
    -------------------------------------------------------------------------- */
 
 .site-header {
+  padding-top: env(safe-area-inset-top);
   position: sticky;
   top: 0;
   z-index: 60;
@@ -1567,7 +1568,7 @@ kbd {
    -------------------------------------------------------------------------- */
 
 .game-page {
-  padding-block: 1.4rem 0;
+  padding-block: 1.4rem calc(1rem + env(safe-area-inset-bottom));
 }
 
 .game-shell {
@@ -1598,7 +1599,7 @@ kbd {
 .hud-label {
   color: var(--dim);
   font-family: var(--font-mono);
-  font-size: 0.54rem;
+  font-size: 0.6rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
@@ -1765,7 +1766,7 @@ kbd {
   margin-top: 1.4rem;
   color: var(--dim);
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: 0.68rem;
   letter-spacing: 0.04em;
   line-height: 1.8;
 }
@@ -1935,6 +1936,7 @@ kbd {
 
 .touch-controls {
   display: none;
+  padding-bottom: env(safe-area-inset-bottom);
   grid-template-columns: 1fr 1.4fr 1fr;
   gap: 0.6rem;
   margin-top: 0.8rem;
@@ -2504,11 +2506,11 @@ kbd {
   }
 
   .overlay-hint {
-    font-size: 0.55rem;
+    font-size: 0.64rem;
   }
 
   .hud-label {
-    font-size: 0.48rem;
+    font-size: 0.54rem;
   }
 
   .score-form {

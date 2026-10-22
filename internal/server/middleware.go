@@ -94,8 +94,32 @@ func securityHeaders(next http.Handler) http.Handler {
 			"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "+
 				"img-src 'self' data:; connect-src 'self'; base-uri 'none'; "+
 				"form-action 'self'; frame-ancestors 'none'; object-src 'none'")
+		if requestIsHTTPS(r) {
+			h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
 		if strings.HasPrefix(r.URL.Path, "/static/") {
 			h.Set("Cache-Control", "public, max-age=300")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// requestIsHTTPS reports whether the browser used HTTPS, either directly or
+// through a TLS-terminating reverse proxy. The forwarded header is only used
+// for cookie/HSTS decisions, never for authentication.
+func requestIsHTTPS(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")), "https")
+}
+
+// noDirectoryListing blocks http.FileServer's automatic directory listings.
+func noDirectoryListing(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "" || strings.HasSuffix(r.URL.Path, "/") {
+			http.NotFound(w, r)
+			return
 		}
 		next.ServeHTTP(w, r)
 	})

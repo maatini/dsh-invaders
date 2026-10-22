@@ -8,10 +8,10 @@ Ein modernes Space-Invaders-Remake als kleine, vollständige Web-App: **Go + HTM
 
 ## Schnellstart
 
-Voraussetzungen: [mise](https://mise.jdx.dev/) (empfohlen) oder Go 1.26+.
+Voraussetzungen: [mise](https://mise.jdx.dev/) (empfohlen) oder Go 1.26.10+.
 
 ```bash
-mise install          # installiert Go 1.26.2 laut mise.toml
+mise install          # installiert Go 1.26.10 laut mise.toml
 mise run dev          # startet den Server auf http://127.0.0.1:4300
 ```
 
@@ -43,6 +43,7 @@ go build -o bin/neon-invaders ./cmd/neon-invaders
 ```bash
 mise run test         # go test ./...
 mise run check        # gofmt-Check, go vet, Tests
+mise run vuln         # govulncheck (Go-Standardbibliothek + Module)
 ```
 
 ---
@@ -84,8 +85,9 @@ Die Spielmechanik läuft ausschließlich im Browser. Der Server rendert nur die 
 │   │   ├── server.go              # Server, Routing, Template-Funcs, View-Model
 │   │   ├── handlers.go            # Seiten, Score-API, Health, Fehlerbehandlung
 │   │   ├── middleware.go          # Logging, Recovery, Security-Header, Origin-Check
+│   │   ├── gzip.go                # gzip-Aushandlung für Textantworten
 │   │   ├── settings.go            # Sound/Difficulty als Cookies
-│   │   └── token.go               # HMAC-signierte Run-Tokens + Plausibilität
+│   │   └── token.go               # HMAC-Run-Tokens, Einmal-Verbrauch, Plausibilität
 │   └── store/
 │       ├── store.go               # SQLite-Store, Migration, Validierung
 │       └── store_test.go          # Tests für Sortierung, Rank, Persistenz, Validierung
@@ -98,6 +100,8 @@ Die Spielmechanik läuft ausschließlich im Browser. Der Server rendert nur die 
 │       ├── js/app.js              # HTMX-Fehlerbehandlung, Header-Verhalten
 │       ├── js/htmx.min.js         # HTMX 2.0.4, lokal vendored
 │       └── favicon.svg
+├── .github/workflows/ci.yml       # Format, Vet, Race-Tests, govulncheck
+├── LICENSE                        # MIT
 ├── mise.toml
 ├── go.mod
 └── README.md
@@ -114,8 +118,8 @@ Die Spielmechanik läuft ausschließlich im Browser. Der Server rendert nur die 
 
 - Name: 1–16 Zeichen, getrimmt, mehrfache Leerzeichen zusammengefasst; erlaubt sind Buchstaben, Zahlen, Leerzeichen, `.`, `_`, `-`.
 - Score: ganzzahlig, `0 … 10.000.000`, SQLite-`CHECK` zusätzlich.
-- Run-Token: HMAC-SHA256 über Ausstellungszeit und Schwierigkeitsgrad, max. 4 Stunden gültig.
-- Plausibilität: maximal `2.000 + 2.500 × Laufzeitsekunden` Punkte und maximal `1 + Laufzeit/12 s` Wellen. Offensichtliche Manipulationen werden abgelehnt; das ist eine Plausibilitätsprüfung, kein kryptografischer Gameplay-Beweis (der Score wird vom Client gemeldet).
+- Run-Token: HMAC-SHA256 über Ausstellungszeit, Schwierigkeitsgrad und eine zufällige Run-ID (`jti`), max. 4 Stunden gültig. Jeder Token wird nach erfolgreichem Eintrag einmalig verbraucht (pro laufender Server-Instanz); ein erneuter Versuch mit demselben Token wird abgelehnt.
+- Plausibilität: maximal `2.000 + 2.500 × Laufzeitsekunden` Punkte und maximal `1 + Laufzeit/8 s` Wellen (Cap 999). Offensichtliche Manipulationen werden abgelehnt; das ist eine Plausibilitätsprüfung, kein kryptografischer Gameplay-Beweis (der Score wird vom Client gemeldet).
 - Die Schwierigkeit wird aus dem signierten Token gelesen, nicht aus einem manipulierbaren Formularfeld.
 - Doppelte Scores sind erlaubt; bei Gleichstand rankt der ältere Eintrag zuerst.
 
@@ -157,7 +161,7 @@ Standardpfad: `data/neon-invaders.db` (Verzeichnis wird automatisch erstellt). D
 
 | Flag | Env-Variable | Default |
 | --- | --- | --- |
-| `-addr` | `ADDR` | `:4300` |
+| `-addr` | `ADDR` | `127.0.0.1:4300` |
 | `-db` | `DB_PATH` | `data/neon-invaders.db` |
 | `-log-level` | `LOG_LEVEL` | `info` (`debug`, `info`, `warn`, `error`) |
 | `-version` | – | Binary-Version ausgeben |
@@ -182,7 +186,9 @@ mise run build
 ./bin/neon-invaders -addr 127.0.0.1:4300 -db data/neon-invaders.db
 ```
 
-Der Server loggt jede Anfrage strukturiert (Methode, Pfad, Status, Dauer), fängt Panics ab und setzt Security-Header (CSP, `X-Content-Type-Options`, `X-Frame-Options`, …). Statische Assets werden 5 Minuten gecacht.
+Der Server loggt jede Anfrage strukturiert (Methode, Pfad, Status, Dauer), fängt Panics ab und setzt Security-Header (CSP, `X-Content-Type-Options`, `X-Frame-Options`, HSTS hinter TLS, …). Textantworten werden bei Bedarf gzip-komprimiert; Verzeichnislistings unter `/static/` sind deaktiviert. Statische Assets werden 5 Minuten gecacht.
+
+Der Default bindet nur an `127.0.0.1`. Für den Zugriff aus dem LAN bewusst `ADDR=:4300` setzen – die Score-API hat keine Authentifizierung.
 
 ### Sound
 
@@ -191,7 +197,11 @@ Alle Effekte werden zur Laufzeit synthetisiert; es gibt keine Audiodateien. Der 
 ### Getestet
 
 - `internal/store`: Insert/Read, Sortierung und Tie-Breaks, `Best`, `Rank`, `Stats`, Persistenz über Reopen, Namens-/Score-/Level-Validierung, Unicode-Namen.
-- `internal/server`: Rendering aller Seiten, Security-Header, Health-Endpoint, gültige und ungültige Score-Einreichungen (Token, Ablauf, Plausibilität, Name), `/api/run`, Settings-Cookie-Roundtrip, 404-Handling.
-- Zusätzlich manuell im Headless-Browser geprüft: Spielstart, Bewegung/Schuss, Pause, Treffer/Leben, Game Over, HTMX-Validierungsfehler, erfolgreiches Speichern, Restart, Levelwechsel sowie Desktop- und Mobile-Layout.
+- `internal/server`: Rendering aller Seiten, Security-Header/HSTS, Health-Endpoint, gültige und ungültige Score-Einreichungen (Token, Ablauf, Plausibilität, Name, Einmal-Verbrauch), 413-Limit, Cross-Origin-Schutz, `/api/run`, Settings-Cookie-Roundtrip, gzip und Static-Listing, 404-Handling.
+- Zusätzlich im Headless-Browser geprüft: Spielstart, Bewegung/Schuss, Pause/Fokus, Treffer/Leben, Game Over, HTMX-Validierungsfehler, erfolgreiches Speichern, Token-Replay-Schutz, `ArrowUp` ohne Seitenscroll, Desktop-/Mobile-Layout (kein horizontaler Overflow), 60 FPS und null axe-Verstöße.
+
+## Lizenz
+
+MIT – siehe [LICENSE](LICENSE). HTMX ist MIT-lizenziert und als vendored Datei unter `web/static/js/htmx.min.js` enthalten.
 
 Viel Spaß beim Jagen des Highscores. 🚀

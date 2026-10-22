@@ -1,6 +1,6 @@
-module neoninvaders
+module github.com/maatini/dsh-invaders
 
-go 1.26.2
+go 1.26.10
 
 require modernc.org/sqlite v1.60.1
 

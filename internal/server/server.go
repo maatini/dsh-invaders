@@ -13,8 +13,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"neoninvaders/internal/store"
-	"neoninvaders/web"
+	"github.com/maatini/dsh-invaders/internal/store"
+	"github.com/maatini/dsh-invaders/web"
 )
 
 var errNilStore = errors.New("server: score store must not be nil")
@@ -29,6 +29,7 @@ type Server struct {
 	version   string
 	now       func() time.Time
 	started   time.Time
+	runs      *runRegistry
 }
 
 // Options configures a Server. Zero values are replaced by sane defaults.
@@ -70,6 +71,7 @@ func New(st *store.Store, opts Options) (*Server, error) {
 		version: strings.TrimSpace(opts.Version),
 		now:     now,
 		started: now(),
+		runs:    newRunRegistry(),
 	}
 	if s.version == "" {
 		s.version = "dev"
@@ -89,7 +91,9 @@ func (s *Server) Handler() http.Handler {
 	return recoverPanics(s.log)(
 		securityHeaders(
 			s.logRequests(
-				sameOrigin(mux),
+				gzipResponses(
+					sameOrigin(mux),
+				),
 			),
 		),
 	)
@@ -106,7 +110,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/scores", s.handleScoresAPI)
 	mux.HandleFunc("GET /api/run", s.handleNewRun)
 	mux.HandleFunc("GET /healthz", s.handleHealth)
-	mux.Handle("GET /static/", http.StripPrefix("/static/", s.static))
+	mux.Handle("GET /static/", http.StripPrefix("/static/", noDirectoryListing(s.static)))
 	mux.HandleFunc("GET /", s.handleNotFound)
 	return mux
 }
@@ -129,7 +133,6 @@ type pageData struct {
 	Notice     string
 	Status     int
 	StatusText string
-	Version    string
 	Year       int
 }
 
@@ -148,7 +151,6 @@ func (s *Server) page(r *http.Request, title, nav string) pageData {
 		Title:    title,
 		Nav:      nav,
 		Settings: readSettings(r),
-		Version:  s.version,
 		Year:     s.now().Year(),
 	}
 }
@@ -203,13 +205,11 @@ func isNoScores(err error) bool {
 
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"formatNumber":   formatNumber,
-		"formatDate":     formatDate,
-		"formatDateTime": formatDateTime,
-		"difficulty":     difficultyLabel,
-		"initial":        initial,
-		"add":            func(a, b int) int { return a + b },
-		"rank":           func(i int) string { return leftPad(strconv.Itoa(i+1), 2, '0') },
+		"formatNumber": formatNumber,
+		"formatDate":   formatDate,
+		"difficulty":   difficultyLabel,
+		"initial":      initial,
+		"rank":         func(i int) string { return leftPad(strconv.Itoa(i+1), 2, '0') },
 	}
 }
 
@@ -238,14 +238,7 @@ func formatDate(t time.Time) string {
 	if t.IsZero() {
 		return "–"
 	}
-	return t.Format("02.01.2006")
-}
-
-func formatDateTime(t time.Time) string {
-	if t.IsZero() {
-		return "–"
-	}
-	return t.Format("02.01.2006 · 15:04")
+	return t.In(time.Local).Format("02.01.2006")
 }
 
 func initial(name string) string {

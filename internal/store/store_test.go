@@ -210,3 +210,38 @@ func TestNormalizeDifficulty(t *testing.T) {
 		}
 	}
 }
+
+func TestMemoryStore(t *testing.T) {
+	s, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("Open(:memory:): %v", err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+
+	if _, err := s.Add(context.Background(), NewScore{Name: "Nova", Score: 1230, Level: 2}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+	top, err := s.Top(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("Top: %v", err)
+	}
+	if len(top) != 1 || top[0].Name != "Nova" {
+		t.Fatalf("Top = %+v, want Nova", top)
+	}
+}
+
+func TestTopLimitIsCapped(t *testing.T) {
+	s := newTestStore(t)
+	for i := 1; i <= 3; i++ {
+		if _, err := s.Add(context.Background(), NewScore{Name: "Nova", Score: i * 10, Level: 1}); err != nil {
+			t.Fatalf("Add: %v", err)
+		}
+	}
+	top, err := s.Top(context.Background(), 101)
+	if err != nil {
+		t.Fatalf("Top: %v", err)
+	}
+	if len(top) != 3 {
+		t.Fatalf("Top(101) returned %d entries, want 3", len(top))
+	}
+}

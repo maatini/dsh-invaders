@@ -12,7 +12,7 @@
     document.body.addEventListener("htmx:beforeSwap", function (event) {
       var xhr = event.detail.xhr;
       if (!xhr) return;
-      if (xhr.status !== 422 && xhr.status !== 500) return;
+      if ([400, 413, 422, 500].indexOf(xhr.status) === -1) return;
       var type = xhr.getResponseHeader("Content-Type") || "";
       if (type.indexOf("text/html") === -1) return;
       event.detail.shouldSwap = true;

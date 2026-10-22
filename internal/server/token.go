@@ -8,9 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
-	"neoninvaders/internal/store"
+	"github.com/maatini/dsh-invaders/internal/store"
 )
 
 const (
@@ -23,14 +24,17 @@ var errInvalidToken = errors.New("invalid run token")
 
 // runInfo is the trusted data recovered from a signed run token.
 type runInfo struct {
+	ID         string
 	IssuedAt   time.Time
 	Difficulty string
 }
 
-// runClaims is the JSON payload embedded in a run token.
+// runClaims is the JSON payload embedded in a run token. jti makes each token
+// single-use: the server records consumed IDs for the token lifetime.
 type runClaims struct {
 	IssuedAt   int64  `json:"iat"`
 	Difficulty string `json:"difficulty"`
+	ID         string `json:"jti"`
 }
 
 // newSecret returns a random 32-byte HMAC key.
@@ -46,9 +50,14 @@ func newSecret() ([]byte, error) {
 // binds a submitted score to a server-issued start time, which lets the server
 // reject implausible scores without trusting hidden form fields.
 func issueRunToken(secret []byte, now time.Time, difficulty string) (string, error) {
+	id, err := newRunID()
+	if err != nil {
+		return "", err
+	}
 	claims := runClaims{
 		IssuedAt:   now.UTC().Unix(),
 		Difficulty: store.NormalizeDifficulty(difficulty),
+		ID:         id,
 	}
 	payload, err := json.Marshal(claims)
 	if err != nil {
@@ -78,7 +87,7 @@ func verifyRunToken(secret []byte, token string, now time.Time) (runInfo, error)
 	if err := json.Unmarshal(raw, &claims); err != nil {
 		return runInfo{}, errInvalidToken
 	}
-	if claims.IssuedAt <= 0 {
+	if claims.IssuedAt <= 0 || claims.ID == "" || len(claims.ID) > 64 {
 		return runInfo{}, errInvalidToken
 	}
 	issued := time.Unix(claims.IssuedAt, 0).UTC()
@@ -88,13 +97,63 @@ func verifyRunToken(secret []byte, token string, now time.Time) (runInfo, error)
 	if now.Sub(issued) > runTokenMaxAge {
 		return runInfo{}, fmt.Errorf("%w: run expired", errInvalidToken)
 	}
-	return runInfo{IssuedAt: issued, Difficulty: store.NormalizeDifficulty(claims.Difficulty)}, nil
+	return runInfo{
+		ID:         claims.ID,
+		IssuedAt:   issued,
+		Difficulty: store.NormalizeDifficulty(claims.Difficulty),
+	}, nil
 }
 
 func sign(secret []byte, payload string) string {
 	mac := hmac.New(sha256.New, secret)
 	mac.Write([]byte(payload))
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
+func newRunID() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("server: generate run id: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// runRegistry tracks consumed token IDs until the token would have expired.
+// It is intentionally in-memory: a restart invalidates tokens issued before it
+// when no SECRET_KEY is configured, and a persistent SECRET_KEY only needs to
+// survive for the token lifetime anyway.
+type runRegistry struct {
+	mu   sync.Mutex
+	used map[string]time.Time
+}
+
+func newRunRegistry() *runRegistry {
+	return &runRegistry{used: make(map[string]time.Time)}
+}
+
+// claim reserves a token ID. It returns false when the ID was already used.
+func (r *runRegistry) claim(id string, now time.Time) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.used) > 512 {
+		for key, expiry := range r.used {
+			if now.After(expiry) {
+				delete(r.used, key)
+			}
+		}
+	}
+	if _, exists := r.used[id]; exists {
+		return false
+	}
+	r.used[id] = now.Add(runTokenMaxAge)
+	return true
+}
+
+// release returns a claimed ID so a transient failure can be retried.
+func (r *runRegistry) release(id string) {
+	r.mu.Lock()
+	delete(r.used, id)
+	r.mu.Unlock()
 }
 
 func cutToken(token string) (payload, signature string, ok bool) {
@@ -124,15 +183,16 @@ func plausibleMaxScore(elapsed time.Duration) int {
 	return limit
 }
 
-// plausibleMaxLevel bounds the wave number by elapsed time. Clearing a wave
-// takes at least ~12 seconds even for a perfect run.
+// plausibleMaxLevel bounds the wave number by elapsed time. A perfect run can
+// clear a wave in roughly eight seconds with power-ups, so the bound is
+// deliberately generous. The store accepts waves up to 999.
 func plausibleMaxLevel(elapsed time.Duration) int {
 	if elapsed < 0 {
 		return 1
 	}
-	level := 1 + int(elapsed.Seconds()/12)
-	if level > 99 {
-		return 99
+	level := 1 + int(elapsed.Seconds()/8)
+	if level > 999 {
+		return 999
 	}
 	return level
 }
