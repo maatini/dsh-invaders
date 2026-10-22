@@ -66,7 +66,7 @@ Ziel: Die Invader-Formation auslöschen, ohne alle Leben zu verlieren. Die Forma
 - **Formation** aus 45 Invasoren in fünf Reihen und drei Typen (Squid, Crab, Octopus) mit eigenen Punkten, Farben und Animationen.
 - **Vier Bunker** aus einzelnen, zerstörbaren Zellen – Schüsse und Bomben nagen echte Löcher hinein.
 - **Mystery-UFO** fliegt periodisch über das Feld, ist 100–300 Punkte wert und lässt häufig ein Power-Up fallen.
-- **Kamikaze-Invader**: Verwandeln sich sporadisch, leuchten rot auf und stürzen auf den Spieler zu. Beim Aufprall auf Bunker, Schiff oder Boden explodieren sie; wer im Explosionsradius steht, verliert ein Leben. Abschießen ist möglich, löst aber ebenfalls die Explosion aus.
+- **Kamikaze-Invader**: Verwandeln sich sporadisch, leuchten rot auf und stürzen mit aggressivem Angriffssound auf den Spieler zu. Beim Aufprall auf Bunker, Schiff oder Boden explodieren sie in einer mehrstufigen Animation aus Feuerball, Schockwellen, Trümmern und Rauch; wer im Explosionsradius steht, verliert ein Leben. Abschießen ist möglich, löst aber ebenfalls die Explosion aus.
 - **Power-Ups**: Rapid-Fire (`R`, 12 s), Spread-Shot (`W`, 12 s), Shield (`S`, 9 s). Sie fallen langsam herab und werden per Kollision eingesammelt.
 - **Wellen** mit steigender Geschwindigkeit, niedrigerer Startposition und dichteren Salven; Wellen-Bonus abhängig von Level und Restleben.
 - **Partikel, Screen-Shake, Glow, Sterne, Scanlines** und ein 5×7-Pixel-Font direkt auf dem Canvas.

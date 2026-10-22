@@ -544,6 +544,31 @@
     this.tone(760, 0.16, { type: "square", endFreq: 180, gain: 0.035, delay: 0.19 });
   };
 
+  SoundEngine.prototype.kamikazeAttack = function () {
+    this.noise(0.38, { gain: 0.14, from: 6200, to: 260 });
+    this.tone(88, 0.42, { type: "sawtooth", endFreq: 42, gain: 0.1 });
+    this.tone(1150, 0.3, { type: "square", endFreq: 240, gain: 0.05 });
+    this.tone(220, 0.3, { type: "sawtooth", endFreq: 780, gain: 0.045, delay: 0.15 });
+  };
+
+  SoundEngine.prototype.kamikazeGrowl = function (proximity) {
+    proximity = clamp(proximity, 0, 1);
+    var base = 115 + proximity * 250;
+    this.tone(base, 0.13, {
+      type: "sawtooth",
+      endFreq: base * 0.45,
+      gain: 0.025 + proximity * 0.03
+    });
+    this.noise(0.12, { gain: 0.02 + proximity * 0.025, from: 1400 + proximity * 1400, to: 180 });
+  };
+
+  SoundEngine.prototype.kamikazeBlast = function () {
+    this.noise(0.68, { gain: 0.24, from: 3200, to: 48 });
+    this.tone(64, 0.72, { type: "sine", endFreq: 26, gain: 0.14 });
+    this.tone(190, 0.42, { type: "sawtooth", endFreq: 38, gain: 0.08 });
+    this.tone(940, 0.2, { type: "square", endFreq: 110, gain: 0.045, delay: 0.03 });
+  };
+
   // ---------------------------------------------------------------------------
   // Game
   // ---------------------------------------------------------------------------
@@ -594,6 +619,7 @@
     this.banner = null;
     this.shakeAmount = 0;
     this.flashAmount = 0;
+    this.flashColor = null;
     this.shootingStar = null;
     this.shootingStarTimer = rand(4, 9);
     this.hudCache = {};
@@ -1357,6 +1383,7 @@
       maxVX: 80 + this.level * 4,
       frame: 0,
       frameTimer: 0,
+      soundTimer: 0,
       sprites: KAMIKAZE_SPRITES[invader.type],
       drawW: type.drawW,
       drawH: type.drawH
@@ -1396,7 +1423,19 @@
 
       if (kamikaze.warning > 0) {
         kamikaze.warning -= dt;
+        if (kamikaze.warning <= 0) {
+          kamikaze.soundTimer = 0.06;
+          this.sound.kamikazeAttack();
+          this.status("Kamikaze im Sturzflug! Weiche aus.");
+        }
         continue;
+      }
+
+      kamikaze.soundTimer -= dt;
+      if (kamikaze.soundTimer <= 0) {
+        var proximity = clamp((kamikaze.y - 120) / (this.player.y - 120), 0, 1);
+        this.sound.kamikazeGrowl(proximity);
+        kamikaze.soundTimer = 0.3 + rand(0, 0.12);
       }
 
       var targetX = this.player.alive ? this.player.x : kamikaze.x;
@@ -1447,20 +1486,36 @@
   };
 
   Game.prototype.explodeAt = function (x, y) {
+    var smoke = [];
+    for (var i = 0; i < 10; i++) {
+      smoke.push({
+        angle: rand(0, TAU),
+        dist: rand(6, 30),
+        size: rand(7, 17),
+        rise: rand(10, 38),
+        delay: rand(0, 0.12)
+      });
+    }
+
     this.explosions.push({
       x: x,
       y: y,
       age: 0,
-      life: 0.55,
-      radius: KAMIKAZE_EXPLOSION_RADIUS
+      life: 0.9,
+      radius: KAMIKAZE_EXPLOSION_RADIUS,
+      rotation: rand(0, TAU),
+      secondary: false,
+      smoke: smoke
     });
-    this.burst(x, y, COLORS.amber, 34, 320, 3.4);
-    this.burst(x, y, COLORS.red, 24, 220, 2.8);
-    this.burst(x, y, COLORS.white, 10, 150, 2);
+    this.burst(x, y, COLORS.white, 18, 430, 2.6);
+    this.burst(x, y, COLORS.amber, 46, 360, 3.8);
+    this.burst(x, y, COLORS.red, 34, 260, 3.2);
+    this.burst(x, y, COLORS.pink, 18, 210, 2.6);
+    this.burst(x, y, COLORS.green, 12, 170, 2);
     this.blastBunkers(x, y, KAMIKAZE_EXPLOSION_RADIUS * 0.85);
-    this.shake(12);
-    this.flash(0.32);
-    this.sound.explode();
+    this.shake(20);
+    this.flash(0.55, COLORS.amber);
+    this.sound.kamikazeBlast();
 
     if (!this.player.alive) return;
     var rect = this.playerRect();
@@ -2003,6 +2058,19 @@
     for (var i = this.explosions.length - 1; i >= 0; i--) {
       var explosion = this.explosions[i];
       explosion.age += dt;
+      if (!explosion.secondary && explosion.age >= 0.16) {
+        explosion.secondary = true;
+        this.burst(
+          explosion.x + rand(-10, 10),
+          explosion.y + rand(-8, 8),
+          COLORS.amber,
+          16,
+          190,
+          2.6
+        );
+        this.burst(explosion.x, explosion.y, COLORS.white, 10, 150, 2);
+        this.shake(7);
+      }
       if (explosion.age >= explosion.life) this.explosions.splice(i, 1);
     }
   };
@@ -2044,9 +2112,10 @@
     this.shakeAmount = Math.max(this.shakeAmount, amount);
   };
 
-  Game.prototype.flash = function (amount) {
+  Game.prototype.flash = function (amount, color) {
     if (this.reduceMotion) return;
     this.flashAmount = Math.max(this.flashAmount, amount);
+    this.flashColor = color || null;
   };
 
   // ---------------------------------------------------------------------------
@@ -2214,8 +2283,9 @@
     this.drawBombs(ctx);
     this.drawPlayer(ctx);
     this.drawBullets(ctx);
+    this.drawExplosionBodies(ctx);
     this.drawParticles(ctx);
-    this.drawExplosions(ctx);
+    this.drawExplosionShockwaves(ctx);
     this.drawTexts(ctx);
     this.drawBanner(ctx);
 
@@ -2224,7 +2294,7 @@
     if (this.flashAmount > 0.01) {
       ctx.save();
       ctx.globalAlpha = Math.min(0.5, this.flashAmount);
-      ctx.fillStyle = this.lives > 0 ? COLORS.cyan : COLORS.red;
+      ctx.fillStyle = this.flashColor || (this.lives > 0 ? COLORS.cyan : COLORS.red);
       ctx.fillRect(0, 0, VW, VH);
       ctx.restore();
     }
@@ -2546,27 +2616,99 @@
     ctx.restore();
   };
 
-  Game.prototype.drawExplosions = function (ctx) {
+  Game.prototype.drawExplosionBodies = function (ctx) {
+    for (var i = 0; i < this.explosions.length; i++) {
+      var explosion = this.explosions[i];
+      var progress = clamp(explosion.age / explosion.life, 0, 1);
+
+      ctx.save();
+      for (var s = 0; s < explosion.smoke.length; s++) {
+        var puff = explosion.smoke[s];
+        var t = clamp((progress - puff.delay) / (1 - puff.delay), 0, 1);
+        if (t <= 0) continue;
+        var eased = easeOutCubic(t);
+        var px = explosion.x + Math.cos(puff.angle) * puff.dist * eased;
+        var py = explosion.y + Math.sin(puff.angle) * puff.dist * eased - puff.rise * eased;
+        var radius = puff.size * (0.5 + eased * 2.2);
+        ctx.globalAlpha = (1 - t) * 0.24;
+        ctx.fillStyle = "rgb(104, 78, 112)";
+        ctx.beginPath();
+        ctx.arc(px, py, radius, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      var coreProgress = clamp(progress * 2.2, 0, 1);
+      var coreRadius = explosion.radius * (0.2 + 0.58 * easeOutCubic(coreProgress));
+      var alpha = Math.pow(1 - progress, 1.35);
+      if (alpha <= 0.01) continue;
+
+      var gradient = ctx.createRadialGradient(
+        explosion.x,
+        explosion.y,
+        0,
+        explosion.x,
+        explosion.y,
+        coreRadius
+      );
+      gradient.addColorStop(0, "rgba(255, 255, 236, " + alpha + ")");
+      gradient.addColorStop(0.28, "rgba(255, 209, 102, " + alpha * 0.95 + ")");
+      gradient.addColorStop(0.62, "rgba(255, 92, 122, " + alpha * 0.65 + ")");
+      gradient.addColorStop(1, "rgba(255, 92, 122, 0)");
+
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(explosion.x, explosion.y, coreRadius, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+  };
+
+  Game.prototype.drawExplosionShockwaves = function (ctx) {
     for (var i = 0; i < this.explosions.length; i++) {
       var explosion = this.explosions[i];
       var progress = clamp(explosion.age / explosion.life, 0, 1);
       var radius = Math.max(1, explosion.radius * easeOutCubic(progress));
+
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = (1 - progress) * 0.9;
-      ctx.strokeStyle = COLORS.amber;
-      ctx.lineWidth = 1 + 3 * (1 - progress);
+
+      ctx.globalAlpha = (1 - progress) * 0.95;
+      ctx.strokeStyle = "#fff7d6";
+      ctx.lineWidth = 1 + 4 * (1 - progress);
       ctx.shadowColor = COLORS.amber;
-      ctx.shadowBlur = 18;
+      ctx.shadowBlur = 14;
       ctx.beginPath();
       ctx.arc(explosion.x, explosion.y, radius, 0, TAU);
       ctx.stroke();
+      ctx.shadowBlur = 0;
 
-      ctx.globalAlpha = (1 - progress) * 0.3;
-      ctx.fillStyle = COLORS.red;
-      ctx.beginPath();
-      ctx.arc(explosion.x, explosion.y, radius * 0.62, 0, TAU);
-      ctx.fill();
+      var second = clamp((progress - 0.12) / 0.88, 0, 1);
+      if (second > 0) {
+        ctx.globalAlpha = (1 - second) * 0.65;
+        ctx.strokeStyle = COLORS.pink;
+        ctx.lineWidth = 1 + 2 * (1 - second);
+        ctx.beginPath();
+        ctx.arc(explosion.x, explosion.y, explosion.radius * 0.78 * easeOutCubic(second), 0, TAU);
+        ctx.stroke();
+      }
+
+      ctx.translate(explosion.x, explosion.y);
+      ctx.rotate(explosion.rotation + progress * 0.8);
+      ctx.globalAlpha = (1 - progress) * 0.7;
+      ctx.strokeStyle = COLORS.amber;
+      ctx.lineWidth = 1.5;
+      var outer = explosion.radius * (0.55 + 0.55 * easeOutCubic(progress));
+      var inner = explosion.radius * 0.18 * (1 - progress);
+      for (var ray = 0; ray < 12; ray++) {
+        var angle = (ray / 12) * TAU;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
+        ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+        ctx.stroke();
+      }
       ctx.restore();
     }
   };
