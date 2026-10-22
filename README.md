@@ -66,6 +66,7 @@ Ziel: Die Invader-Formation auslöschen, ohne alle Leben zu verlieren. Die Forma
 - **Formation** aus 45 Invasoren in fünf Reihen und drei Typen (Squid, Crab, Octopus) mit eigenen Punkten, Farben und Animationen.
 - **Vier Bunker** aus einzelnen, zerstörbaren Zellen – Schüsse und Bomben nagen echte Löcher hinein.
 - **Mystery-UFO** fliegt periodisch über das Feld, ist 100–300 Punkte wert und lässt häufig ein Power-Up fallen.
+- **Kamikaze-Invader**: Verwandeln sich sporadisch, leuchten rot auf und stürzen auf den Spieler zu. Beim Aufprall auf Bunker, Schiff oder Boden explodieren sie; wer im Explosionsradius steht, verliert ein Leben. Abschießen ist möglich, löst aber ebenfalls die Explosion aus.
 - **Power-Ups**: Rapid-Fire (`R`, 12 s), Spread-Shot (`W`, 12 s), Shield (`S`, 9 s). Sie fallen langsam herab und werden per Kollision eingesammelt.
 - **Wellen** mit steigender Geschwindigkeit, niedrigerer Startposition und dichteren Salven; Wellen-Bonus abhängig von Level und Restleben.
 - **Partikel, Screen-Shake, Glow, Sterne, Scanlines** und ein 5×7-Pixel-Font direkt auf dem Canvas.
@@ -198,7 +199,7 @@ Alle Effekte werden zur Laufzeit synthetisiert; es gibt keine Audiodateien. Der 
 
 - `internal/store`: Insert/Read, Sortierung und Tie-Breaks, `Best`, `Rank`, `Stats`, Persistenz über Reopen, Namens-/Score-/Level-Validierung, Unicode-Namen.
 - `internal/server`: Rendering aller Seiten, Security-Header/HSTS, Health-Endpoint, gültige und ungültige Score-Einreichungen (Token, Ablauf, Plausibilität, Name, Einmal-Verbrauch), 413-Limit, Cross-Origin-Schutz, `/api/run`, Settings-Cookie-Roundtrip, gzip und Static-Listing, 404-Handling.
-- Zusätzlich im Headless-Browser geprüft: Spielstart, Bewegung/Schuss, Pause/Fokus, Treffer/Leben, Game Over, HTMX-Validierungsfehler, erfolgreiches Speichern, Token-Replay-Schutz, `ArrowUp` ohne Seitenscroll, Desktop-/Mobile-Layout (kein horizontaler Overflow), 60 FPS und null axe-Verstöße.
+- Zusätzlich im Headless-Browser geprüft: Spielstart, Bewegung/Schuss, Pause/Fokus, Treffer/Leben, Game Over, HTMX-Validierungsfehler, erfolgreiches Speichern, Token-Replay-Schutz, `ArrowUp` ohne Seitenscroll, Kamikaze-Transformation, Explosion nah/fern, Boden- und Bunker-Aufprall, Abschuss, Warten auf das Level-Ende, Desktop-/Mobile-Layout (kein horizontaler Overflow), 60 FPS und null axe-Verstöße.
 
 ## Lizenz
 

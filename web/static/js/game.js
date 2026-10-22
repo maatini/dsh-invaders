@@ -17,6 +17,8 @@
   var COL_GAP = 36;
   var ROW_GAP = 42;
   var PLAYER_Y = 646;
+  var KAMIKAZE_EXPLOSION_RADIUS = 62;
+  var KAMIKAZE_WARNING = 0.9;
 
   var COLORS = {
     cyan: "#5ef2ff",
@@ -311,6 +313,12 @@
 
   var PLAYER_SPRITE = makeSprite(SHIP, COLORS.cyan, 3);
   var UFO_SPRITE = makeSprite(UFO, COLORS.amber, 3);
+  var KAMIKAZE_SPRITES = {};
+  Object.keys(INVADER_TYPES).forEach(function (key) {
+    KAMIKAZE_SPRITES[key] = INVADER_TYPES[key].frames.map(function (rows) {
+      return makeSprite(rows, COLORS.red, 3);
+    });
+  });
 
   var POWERUP_TYPES = {
     rapid: { color: COLORS.amber, letter: "R", label: "RAPID FIRE", duration: 12 },
@@ -531,6 +539,11 @@
     this.tone(notes[step % 4], 0.09, { type: "square", gain: 0.024 });
   };
 
+  SoundEngine.prototype.kamikaze = function () {
+    this.tone(180, 0.2, { type: "sawtooth", endFreq: 760, gain: 0.045 });
+    this.tone(760, 0.16, { type: "square", endFreq: 180, gain: 0.035, delay: 0.19 });
+  };
+
   // ---------------------------------------------------------------------------
   // Game
   // ---------------------------------------------------------------------------
@@ -560,6 +573,8 @@
     this.bullets = [];
     this.bombs = [];
     this.powerups = [];
+    this.kamikazes = [];
+    this.explosions = [];
     this.particles = [];
     this.texts = [];
     this.bunkers = [];
@@ -568,6 +583,7 @@
     this.formation = null;
 
     this.bombTimer = 2;
+    this.kamikazeTimer = 0;
     this.ufoTimer = 10;
     this.ufoBlipTimer = 0;
     this.marchTimer = 0;
@@ -885,6 +901,9 @@
     this.bullets.length = 0;
     this.bombs.length = 0;
     this.powerups.length = 0;
+    this.kamikazes.length = 0;
+    this.explosions.length = 0;
+    this.kamikazeTimer = this.nextKamikazeDelay();
     this.ufo = null;
     this.ufoTimer = rand(9, 15);
     this.ufoBlipTimer = 0;
@@ -1217,10 +1236,11 @@
   };
 
   Game.prototype.updateMarch = function (dt) {
+    var alive = this.aliveInvaders().length;
+    if (!alive) return;
     this.marchTimer -= dt;
     if (this.marchTimer <= 0) {
       this.sound.march(this.marchStep++);
-      var alive = this.aliveInvaders().length;
       this.marchTimer = clamp(0.62 - (COLS * ROWS - alive) * 0.007 - this.level * 0.015, 0.2, 0.62);
     }
   };
@@ -1263,6 +1283,15 @@
         }
         if (dead) break;
 
+        for (var k = 0; k < this.kamikazes.length; k++) {
+          if (rectsOverlap(this.bulletRect(bullet), this.kamikazeRect(this.kamikazes[k]))) {
+            this.detonateKamikaze(this.kamikazes[k], true);
+            dead = true;
+            break;
+          }
+        }
+        if (dead) break;
+
         if (this.hitBunker(bullet.x, bullet.y, 1.2)) {
           dead = true;
         }
@@ -1287,9 +1316,183 @@
     this.shake(2.4);
     this.sound.hit();
     this.maybeDropPowerup(pos.x, pos.y, 0.095);
-    if (this.aliveInvaders().length === 0) {
-      this.clearLevel();
+    this.checkLevelClear();
+  };
+
+  // ---------------------------------------------------------------------------
+  // Kamikaze invaders
+  // ---------------------------------------------------------------------------
+
+  Game.prototype.checkLevelClear = function () {
+    if (this.state !== "playing") return;
+    if (this.aliveInvaders().length > 0 || this.kamikazes.length > 0) return;
+    this.clearLevel();
+  };
+
+  Game.prototype.nextKamikazeDelay = function () {
+    var base = Math.max(6, 12 - this.level * 0.5);
+    return rand(base, base + 6);
+  };
+
+  Game.prototype.spawnKamikaze = function () {
+    var alive = this.aliveInvaders();
+    if (alive.length < 6) return;
+
+    var invader = pick(alive);
+    invader.alive = false;
+    var pos = this.invaderPos(invader);
+    var type = INVADER_TYPES[invader.type];
+    var speed = (140 + Math.min(120, this.level * 9)) * this.difficulty.enemySpeed;
+
+    this.kamikazes.push({
+      type: invader.type,
+      x: pos.x,
+      y: pos.y,
+      vx: 0,
+      vy: 0,
+      age: 0,
+      warning: KAMIKAZE_WARNING,
+      speed: speed,
+      maxSpeed: Math.min(320, speed + 110),
+      maxVX: 80 + this.level * 4,
+      frame: 0,
+      frameTimer: 0,
+      sprites: KAMIKAZE_SPRITES[invader.type],
+      drawW: type.drawW,
+      drawH: type.drawH
+    });
+
+    this.sound.kamikaze();
+    this.status("Kamikaze-Invader entdeckt! Weiche aus.");
+  };
+
+  Game.prototype.kamikazeRect = function (kamikaze) {
+    return {
+      x: kamikaze.x - kamikaze.drawW / 2,
+      y: kamikaze.y - kamikaze.drawH / 2,
+      w: kamikaze.drawW,
+      h: kamikaze.drawH
+    };
+  };
+
+  Game.prototype.updateKamikazes = function (dt) {
+    if (this.state !== "playing") return;
+
+    this.kamikazeTimer -= dt;
+    if (this.kamikazeTimer <= 0) {
+      this.kamikazeTimer = this.nextKamikazeDelay();
+      var maxActive = this.level >= 6 ? 2 : 1;
+      if (this.kamikazes.length < maxActive) this.spawnKamikaze();
     }
+
+    for (var i = this.kamikazes.length - 1; i >= 0; i--) {
+      var kamikaze = this.kamikazes[i];
+      kamikaze.age += dt;
+      kamikaze.frameTimer += dt;
+      if (kamikaze.frameTimer >= 0.12) {
+        kamikaze.frameTimer = 0;
+        kamikaze.frame = kamikaze.frame === 0 ? 1 : 0;
+      }
+
+      if (kamikaze.warning > 0) {
+        kamikaze.warning -= dt;
+        continue;
+      }
+
+      var targetX = this.player.alive ? this.player.x : kamikaze.x;
+      var desiredVX = clamp((targetX - kamikaze.x) * 2.2, -kamikaze.maxVX, kamikaze.maxVX);
+      kamikaze.vx = lerp(kamikaze.vx, desiredVX, clamp(dt * 3.5, 0, 1));
+      kamikaze.vy = Math.min(kamikaze.maxSpeed, kamikaze.speed + kamikaze.age * 18);
+
+      var dx = kamikaze.vx * dt;
+      var dy = kamikaze.vy * dt;
+      var steps = Math.max(1, Math.ceil(Math.sqrt(dx * dx + dy * dy) / 3.5));
+
+      for (var step = 0; step < steps; step++) {
+        kamikaze.x = clamp(kamikaze.x + dx / steps, 18, VW - 18);
+        kamikaze.y += dy / steps;
+
+        if (this.hitBunker(kamikaze.x, kamikaze.y + 6, 2.2)) {
+          this.detonateKamikaze(kamikaze);
+          break;
+        }
+        if (this.player.alive && rectsOverlap(this.kamikazeRect(kamikaze), this.playerRect())) {
+          this.detonateKamikaze(kamikaze);
+          break;
+        }
+        if (kamikaze.y >= VH - 16) {
+          kamikaze.y = VH - 16;
+          this.detonateKamikaze(kamikaze);
+          break;
+        }
+      }
+
+      if (this.state !== "playing") return;
+    }
+  };
+
+  Game.prototype.detonateKamikaze = function (kamikaze, shotDown) {
+    var index = this.kamikazes.indexOf(kamikaze);
+    if (index === -1) return;
+    this.kamikazes.splice(index, 1);
+
+    if (shotDown) {
+      var points = this.pointsFor(60 + this.level * 5);
+      this.grantScore(points, kamikaze.x, kamikaze.y - 14, COLORS.amber);
+      this.status("Kamikaze abgeschossen. +" + points + " Punkte.");
+    }
+
+    this.explodeAt(kamikaze.x, kamikaze.y);
+    this.checkLevelClear();
+  };
+
+  Game.prototype.explodeAt = function (x, y) {
+    this.explosions.push({
+      x: x,
+      y: y,
+      age: 0,
+      life: 0.55,
+      radius: KAMIKAZE_EXPLOSION_RADIUS
+    });
+    this.burst(x, y, COLORS.amber, 34, 320, 3.4);
+    this.burst(x, y, COLORS.red, 24, 220, 2.8);
+    this.burst(x, y, COLORS.white, 10, 150, 2);
+    this.blastBunkers(x, y, KAMIKAZE_EXPLOSION_RADIUS * 0.85);
+    this.shake(12);
+    this.flash(0.32);
+    this.sound.explode();
+
+    if (!this.player.alive) return;
+    var rect = this.playerRect();
+    var nearestX = clamp(x, rect.x, rect.x + rect.w);
+    var nearestY = clamp(y, rect.y, rect.y + rect.h);
+    var dx = x - nearestX;
+    var dy = y - nearestY;
+    if (dx * dx + dy * dy <= KAMIKAZE_EXPLOSION_RADIUS * KAMIKAZE_EXPLOSION_RADIUS) {
+      this.hitPlayer(x, y);
+    }
+  };
+
+  Game.prototype.blastBunkers = function (x, y, radius) {
+    var radiusSq = radius * radius;
+    var hit = false;
+    for (var b = 0; b < this.bunkers.length; b++) {
+      var bunker = this.bunkers[b];
+      for (var row = 0; row < bunker.rows; row++) {
+        for (var col = 0; col < bunker.cols; col++) {
+          if (!bunker.cells[row][col]) continue;
+          var cx = bunker.x + (col + 0.5) * bunker.cell;
+          var cy = bunker.y + (row + 0.5) * bunker.cell;
+          var dx = cx - x;
+          var dy = cy - y;
+          if (dx * dx + dy * dy <= radiusSq) {
+            bunker.cells[row][col] = false;
+            hit = true;
+          }
+        }
+      }
+    }
+    if (hit) this.burst(x, y, COLORS.green, 10, 160, 2);
   };
 
   // ---------------------------------------------------------------------------
@@ -1796,6 +1999,14 @@
     }
   };
 
+  Game.prototype.updateExplosions = function (dt) {
+    for (var i = this.explosions.length - 1; i >= 0; i--) {
+      var explosion = this.explosions[i];
+      explosion.age += dt;
+      if (explosion.age >= explosion.life) this.explosions.splice(i, 1);
+    }
+  };
+
   Game.prototype.updateEffects = function (dt) {
     this.shakeAmount = Math.max(0, this.shakeAmount - dt * 32);
     this.flashAmount = Math.max(0, this.flashAmount - dt * 2.4);
@@ -1866,18 +2077,22 @@
       if (this.state !== "playing") return;
       this.updateBombs(dt);
       if (this.state !== "playing") return;
+      this.updateKamikazes(dt);
+      if (this.state !== "playing") return;
       this.updateBombSpawner(dt);
       if (this.state !== "playing") return;
       this.updateUfo(dt);
       this.updatePowerups(dt);
       this.updatePowerTimers(dt);
       this.updateMarch(dt);
+      this.updateExplosions(dt);
       this.updateParticles(dt);
       this.updateTexts(dt);
       this.updateEffects(dt);
       this.updateBanner(dt);
       this.updateHud();
     } else if (this.state === "levelclear") {
+      this.updateExplosions(dt);
       this.updateParticles(dt);
       this.updateTexts(dt);
       this.updateEffects(dt);
@@ -1885,6 +2100,7 @@
       this.levelClearTimer -= dt;
       if (this.levelClearTimer <= 0) this.nextLevel();
     } else if (this.state === "dying") {
+      this.updateExplosions(dt);
       this.updateParticles(dt);
       this.updateTexts(dt);
       this.updateEffects(dt);
@@ -1992,12 +2208,14 @@
     this.drawGrid(ctx);
     this.drawBunkers(ctx);
     this.drawInvaders(ctx);
+    this.drawKamikazes(ctx);
     this.drawUfo(ctx);
     this.drawPowerups(ctx);
     this.drawBombs(ctx);
     this.drawPlayer(ctx);
     this.drawBullets(ctx);
     this.drawParticles(ctx);
+    this.drawExplosions(ctx);
     this.drawTexts(ctx);
     this.drawBanner(ctx);
 
@@ -2140,6 +2358,40 @@
         bob = Math.sin(this.attractT * 1.8 + invader.col * 0.5 + invader.row * 0.3) * 2;
       }
       drawSprite(ctx, type.sprites[frame], pos.x, pos.y + bob, 1);
+    }
+  };
+
+  Game.prototype.drawKamikazes = function (ctx) {
+    for (var i = 0; i < this.kamikazes.length; i++) {
+      var kamikaze = this.kamikazes[i];
+      var warning = kamikaze.warning > 0;
+      var alpha = warning
+        ? 0.55 + 0.45 * Math.abs(Math.sin(kamikaze.age * 18))
+        : 1;
+      var sprite = kamikaze.sprites[kamikaze.frame % kamikaze.sprites.length];
+      drawSprite(ctx, sprite, kamikaze.x, kamikaze.y, alpha);
+
+      if (warning) {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 0.55 + 0.35 * Math.sin(kamikaze.age * 22);
+        ctx.strokeStyle = COLORS.red;
+        ctx.lineWidth = 2;
+        ctx.shadowColor = COLORS.red;
+        ctx.shadowBlur = 14;
+        ctx.beginPath();
+        ctx.arc(kamikaze.x, kamikaze.y, 28 + Math.sin(kamikaze.age * 14) * 3, 0, TAU);
+        ctx.stroke();
+        ctx.restore();
+        pixelText(ctx, "!", kamikaze.x, kamikaze.y - 44, 3, COLORS.amber, "center", 1, 14);
+      } else {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 0.45;
+        ctx.fillStyle = COLORS.red;
+        ctx.fillRect(kamikaze.x - 2, kamikaze.y + 12, 4, rand(8, 20));
+        ctx.restore();
+      }
     }
   };
 
@@ -2292,6 +2544,31 @@
       ctx.fillRect(particle.x - size / 2, particle.y - size / 2, size, size);
     }
     ctx.restore();
+  };
+
+  Game.prototype.drawExplosions = function (ctx) {
+    for (var i = 0; i < this.explosions.length; i++) {
+      var explosion = this.explosions[i];
+      var progress = clamp(explosion.age / explosion.life, 0, 1);
+      var radius = Math.max(1, explosion.radius * easeOutCubic(progress));
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = (1 - progress) * 0.9;
+      ctx.strokeStyle = COLORS.amber;
+      ctx.lineWidth = 1 + 3 * (1 - progress);
+      ctx.shadowColor = COLORS.amber;
+      ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.arc(explosion.x, explosion.y, radius, 0, TAU);
+      ctx.stroke();
+
+      ctx.globalAlpha = (1 - progress) * 0.3;
+      ctx.fillStyle = COLORS.red;
+      ctx.beginPath();
+      ctx.arc(explosion.x, explosion.y, radius * 0.62, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
   };
 
   Game.prototype.drawTexts = function (ctx) {
